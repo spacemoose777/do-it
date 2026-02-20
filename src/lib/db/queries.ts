@@ -1,0 +1,27 @@
+// Re-export all DB operations from indexed-db
+// This file serves as the data access layer abstraction
+export {
+  getAllTasks,
+  getTasksByList,
+  getTask,
+  putTask,
+  deleteTask,
+  putManyTasks,
+  getSubtasksByTask,
+  putSubtask,
+  deleteSubtask,
+  putManySubtasks,
+  getAllTaskLists,
+  getTaskList,
+  putTaskList,
+  deleteTaskList,
+  putManyTaskLists,
+  addToSyncQueue,
+  getAllSyncQueue,
+  removeSyncQueueItem,
+  clearSyncQueue,
+  getSyncQueueCount,
+  getMeta,
+  setMeta,
+  clearAllData,
+} from "./indexed-db";
