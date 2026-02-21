@@ -193,7 +193,7 @@ export async function initialLoad(userId: string): Promise<void> {
     };
     await idb.putTaskList(defaultList);
     // Push to Firestore
-    const { user_id, ...docData } = defaultList as Record<string, unknown>;
+    const { user_id, ...docData } = defaultList as unknown as Record<string, unknown>;
     await setDoc(doc(taskListsCol(userId), defaultList.id), docData);
   }
 

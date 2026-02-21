@@ -1,3 +1,5 @@
+/// <reference lib="webworker" />
+
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { Serwist } from "serwist";
@@ -55,7 +57,7 @@ self.addEventListener("push", (event) => {
         tag: data.tag || "reminder",
         data: data.data,
         vibrate: [200, 100, 200],
-      })
+      } as NotificationOptions & { vibrate?: number[] })
     );
   } catch {
     // Not JSON, use as plain text

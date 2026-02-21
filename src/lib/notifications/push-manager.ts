@@ -41,7 +41,7 @@ export async function showLocalNotification(
       data: { taskId: options?.taskId },
       vibrate: [200, 100, 200],
       ...options,
-    });
+    } as NotificationOptions & { vibrate?: number[] });
   } else {
     // Fallback to regular notification
     new Notification(title, {

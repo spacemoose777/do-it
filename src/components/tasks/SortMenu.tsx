@@ -3,10 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { SORT_OPTIONS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import type { SortField } from "@/hooks/useTasks";
 
 interface SortMenuProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: SortField;
+  onChange: (value: SortField) => void;
 }
 
 export default function SortMenu({ value, onChange }: SortMenuProps) {
@@ -42,7 +43,7 @@ export default function SortMenu({ value, onChange }: SortMenuProps) {
             <button
               key={opt.value}
               onClick={() => {
-                onChange(opt.value);
+                onChange(opt.value as SortField);
                 setIsOpen(false);
               }}
               className={cn(

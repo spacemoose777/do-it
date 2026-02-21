@@ -9,7 +9,7 @@ import { nowISOString, todayDateString } from "@/lib/date-utils";
 import { createNextRecurringTask, clearStaleMyDay } from "@/lib/recurrence";
 import type { Task, TaskCreateInput, TaskUpdateInput } from "@/types/task";
 
-type SortField = "created_at" | "due_date" | "title" | "is_important";
+export type SortField = "created_at" | "due_date" | "title" | "is_important";
 
 export function useTasks(filter?: {
   listId?: string;

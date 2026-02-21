@@ -13,7 +13,7 @@ interface CreateListModalProps {
 
 export default function CreateListModal({ isOpen, onClose, onCreate }: CreateListModalProps) {
   const [name, setName] = useState("");
-  const [color, setColor] = useState(LIST_COLORS[0]);
+  const [color, setColor] = useState<string>(LIST_COLORS[0]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
