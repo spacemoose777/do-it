@@ -1,18 +1,25 @@
 import { v4 as uuidv4 } from "uuid";
 import type { Task } from "@/types/task";
-import { getNextOccurrence, nowISOString, todayDateString } from "./date-utils";
+import { getNextOccurrence, nowISOString, todayDateString, tomorrowDateString } from "./date-utils";
 
 export function createNextRecurringTask(completedTask: Task): Task | null {
   if (!completedTask.recurrence_rule || !completedTask.due_date) {
     return null;
   }
 
-  const nextDueDate = getNextOccurrence(
+  let nextDueDate = getNextOccurrence(
     completedTask.recurrence_rule,
     completedTask.due_date
   );
 
   if (!nextDueDate) return null;
+
+  // If the next occurrence is in the past (task was overdue), jump to tomorrow
+  // instead of backfilling every missed day one at a time
+  const today = todayDateString();
+  if (nextDueDate < today) {
+    nextDueDate = tomorrowDateString();
+  }
 
   const now = nowISOString();
 

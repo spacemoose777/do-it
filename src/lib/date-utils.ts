@@ -55,6 +55,10 @@ export function todayDateString(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
+export function tomorrowDateString(): string {
+  return format(addDays(new Date(), 1), "yyyy-MM-dd");
+}
+
 export function nowISOString(): string {
   return new Date().toISOString();
 }

@@ -31,8 +31,10 @@ function SingleListPage({ listId }: { listId: string }) {
     listId,
     includeCompleted: true,
   });
-  const { lists, deleteList } = useTaskLists();
+  const { lists, deleteList, updateList } = useTaskLists();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const router = useRouter();
 
   const list = lists.find((l) => l.id === listId);
@@ -46,6 +48,12 @@ function SingleListPage({ listId }: { listId: string }) {
     await deleteList(listId);
     router.push("/my-day");
   }, [deleteList, listId, list, router]);
+
+  const handleRename = useCallback(async () => {
+    if (!renameValue.trim()) return;
+    await updateList(listId, { name: renameValue.trim() });
+    setIsRenaming(false);
+  }, [updateList, listId, renameValue]);
 
   if (!list) {
     return (
@@ -82,16 +90,41 @@ function SingleListPage({ listId }: { listId: string }) {
           <div className="flex items-center gap-2">
             <SortMenu value={sortBy} onChange={setSortBy} />
             {!list.is_default && (
-              <button
-                onClick={handleDeleteList}
-                className="btn-ghost text-danger text-sm"
-              >
-                Delete list
-              </button>
+              <>
+                <button
+                  onClick={() => { setRenameValue(list.name); setIsRenaming(true); }}
+                  className="btn-ghost text-sm"
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={handleDeleteList}
+                  className="btn-ghost text-danger text-sm"
+                >
+                  Delete
+                </button>
+              </>
             )}
           </div>
         }
       />
+
+      {isRenaming && (
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            className="input-field text-sm flex-1"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleRename();
+              if (e.key === "Escape") setIsRenaming(false);
+            }}
+            autoFocus
+          />
+          <button onClick={handleRename} className="btn-primary text-sm">Save</button>
+          <button onClick={() => setIsRenaming(false)} className="btn-secondary text-sm">Cancel</button>
+        </div>
+      )}
 
       <div className="space-y-4">
         <TaskInput onAdd={handleAddTask} placeholder={`Add a task to ${list.name}`} />
@@ -118,9 +151,17 @@ function SingleListPage({ listId }: { listId: string }) {
 }
 
 function ListsManagePage() {
-  const { lists, createList } = useTaskLists();
+  const { lists, createList, updateList } = useTaskLists();
   const [showCreate, setShowCreate] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const router = useRouter();
+
+  const handleRename = async (id: string) => {
+    if (!renameValue.trim()) return;
+    await updateList(id, { name: renameValue.trim() });
+    setRenamingId(null);
+  };
 
   return (
     <>
@@ -138,23 +179,52 @@ function ListsManagePage() {
 
       <div className="space-y-2">
         {lists.map((list) => (
-          <button
-            key={list.id}
-            onClick={() => router.push(`/lists/${list.id}`)}
-            className="flex items-center gap-3 w-full px-4 py-3 bg-bg-secondary rounded-xl border border-border hover:bg-bg-tertiary transition-colors"
-          >
-            <span
-              className="w-4 h-4 rounded-full flex-shrink-0"
-              style={{ backgroundColor: list.color }}
-            />
-            <span className="text-sm text-text-primary flex-1 text-left">{list.name}</span>
-            {list.is_default && (
-              <span className="text-xs text-text-secondary bg-bg-tertiary px-2 py-0.5 rounded">Default</span>
+          <div key={list.id}>
+            {renamingId === list.id ? (
+              <div className="flex items-center gap-2 px-4 py-3 bg-bg-secondary rounded-xl border border-accent">
+                <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: list.color }} />
+                <input
+                  className="input-field text-sm flex-1 py-1"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRename(list.id);
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  autoFocus
+                />
+                <button onClick={() => handleRename(list.id)} className="btn-primary text-sm py-1">Save</button>
+                <button onClick={() => setRenamingId(null)} className="btn-secondary text-sm py-1">Cancel</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 w-full px-4 py-3 bg-bg-secondary rounded-xl border border-border">
+                <button
+                  onClick={() => router.push(`/lists/${list.id}`)}
+                  className="flex items-center gap-3 flex-1 min-w-0"
+                >
+                  <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: list.color }} />
+                  <span className="text-sm text-text-primary flex-1 text-left truncate">{list.name}</span>
+                  {list.is_default && (
+                    <span className="text-xs text-text-secondary bg-bg-tertiary px-2 py-0.5 rounded">Default</span>
+                  )}
+                </button>
+                {!list.is_default && (
+                  <button
+                    onClick={() => { setRenameValue(list.name); setRenamingId(list.id); }}
+                    className="p-1.5 text-text-secondary hover:text-text-primary transition-colors flex-shrink-0"
+                    aria-label="Rename list"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                    </svg>
+                  </button>
+                )}
+                <svg className="w-4 h-4 text-text-secondary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
             )}
-            <svg className="w-4 h-4 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-            </svg>
-          </button>
+          </div>
         ))}
       </div>
 

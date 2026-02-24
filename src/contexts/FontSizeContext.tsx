@@ -17,7 +17,7 @@ const FontSizeContext = createContext<FontSizeContextValue>({
 });
 
 export function FontSizeProvider({ children }: { children: ReactNode }) {
-  const [fontSize, setFontSizeState] = useState<FontSize>("normal");
+  const [fontSize, setFontSizeState] = useState<FontSize>("large");
 
   // Load from localStorage on mount and apply to <html>
   useEffect(() => {
@@ -25,6 +25,8 @@ export function FontSizeProvider({ children }: { children: ReactNode }) {
     if (saved && ["normal", "large", "xl"].includes(saved)) {
       setFontSizeState(saved);
       applyFontSize(saved);
+    } else {
+      applyFontSize("large");
     }
   }, []);
 

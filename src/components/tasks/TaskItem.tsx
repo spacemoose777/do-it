@@ -48,7 +48,7 @@ export default function TaskItem({
       <div className="flex-1 min-w-0">
         <p
           className={cn(
-            "text-sm text-text-primary truncate",
+            "text-sm text-text-primary break-words",
             task.is_completed && "line-through text-text-secondary"
           )}
         >
