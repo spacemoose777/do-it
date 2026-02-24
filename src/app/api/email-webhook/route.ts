@@ -1,20 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
 
 export const runtime = "nodejs";
-
-function verifyMailgunSignature(
-  signingKey: string,
-  timestamp: string,
-  token: string,
-  signature: string
-): boolean {
-  const hmac = crypto.createHmac("sha256", signingKey);
-  hmac.update(timestamp + token);
-  return hmac.digest("hex") === signature;
-}
 
 // Extract #hashtag list names from subject
 function extractHashtags(text: string): string[] {
@@ -28,27 +16,29 @@ function stripHashtags(text: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
-  if (!signingKey) {
-    return NextResponse.json({ error: "Mailgun signing key not configured" }, { status: 500 });
+  const webhookSecret = process.env.SENDGRID_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    return NextResponse.json({ error: "SendGrid webhook secret not configured" }, { status: 500 });
+  }
+
+  // Verify secret token from URL query parameter
+  const { searchParams } = new URL(req.url);
+  if (searchParams.get("secret") !== webhookSecret) {
+    return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
   }
 
   // Parse the multipart/form-data body
   const formData = await req.formData();
-  const timestamp = formData.get("timestamp") as string;
-  const token = formData.get("token") as string;
-  const signature = formData.get("signature") as string;
-  const sender = formData.get("sender") as string || formData.get("from") as string;
+  const from = formData.get("from") as string;
   const subject = (formData.get("subject") as string) || "New Task";
-  const bodyPlain = (formData.get("body-plain") as string) || "";
-
-  // Verify Mailgun webhook signature
-  if (!verifyMailgunSignature(signingKey, timestamp, token, signature)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
+  const bodyPlain = (formData.get("text") as string) || "";
 
   // Extract sender email address
-  const senderEmail = sender.match(/<([^>]+)>/)?.[1] || sender;
+  const senderEmail = from?.match(/<([^>]+)>/)?.[1] || from;
+
+  if (!senderEmail) {
+    return NextResponse.json({ error: "No sender email" }, { status: 400 });
+  }
 
   // Look up Firebase user by email
   let userId: string;

@@ -122,6 +122,46 @@ Open http://localhost:3000 in Chrome. You should see the login page.
 3. Tap it to install the PWA
 4. Long-press the app icon for the "Quick Voice Add" shortcut
 
+## Step 11: Set Up Email-to-Task (SendGrid)
+
+This lets you create tasks by sending an email to a special address.
+
+### 1. Create a SendGrid account
+- Go to [sendgrid.com](https://sendgrid.com) and sign up for a free account
+- Free tier includes 100 inbound emails/day which is plenty for personal use
+
+### 2. Verify a sender domain
+- In the SendGrid dashboard go to **Settings → Sender Authentication**
+- Click **Authenticate Your Domain** and follow the steps to add DNS records to your domain
+- This can take up to an hour
+
+### 3. Set up Inbound Parse
+- Go to **Settings → Inbound Parse**
+- Click **Add Host & URL**
+- Set **Receiving Domain** to a subdomain you want to receive tasks on (e.g. `inbox.yourdomain.com`)
+- Set **Destination URL** to your webhook URL — see step 5 below
+
+### 4. Add DNS MX record
+- In your domain registrar (e.g. Namecheap, GoDaddy, Cloudflare), add an MX record:
+  - **Host:** `inbox` (or whatever subdomain you chose)
+  - **Value:** `mx.sendgrid.net`
+  - **Priority:** `10`
+
+### 5. Generate a webhook secret and set the URL
+- Make up any random string of letters and numbers (e.g. `xK9mP2qR7vT4`) — this is your `SENDGRID_WEBHOOK_SECRET`
+- Add it as an environment variable in Vercel: **Settings → Environment Variables → `SENDGRID_WEBHOOK_SECRET`**
+- Your full webhook URL will be:
+  ```
+  https://your-vercel-domain.com/api/email-webhook?secret=xK9mP2qR7vT4
+  ```
+- Paste this URL into the **Destination URL** field in SendGrid Inbound Parse (step 3)
+
+### 6. Test it
+- Send an email from your registered account to `anything@inbox.yourdomain.com`
+- The subject becomes the task title
+- Add `#listname` in the subject to send it to a specific list (e.g. `Buy milk #shopping`)
+- The email body becomes the task notes
+
 ## Troubleshooting
 
 - **"Firebase: Error" on login**: Double-check your `.env.local` values match exactly
