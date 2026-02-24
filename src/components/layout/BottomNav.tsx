@@ -41,7 +41,7 @@ export default function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-colors min-w-[60px]",
+                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-xl transition-colors",
                 isActive ? "text-accent" : "text-text-secondary"
               )}
             >
@@ -53,7 +53,7 @@ export default function BottomNav() {
         <Link
           href="/lists/manage"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-colors min-w-[60px]",
+            "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-xl transition-colors",
             pathname.startsWith("/lists") ? "text-accent" : "text-text-secondary"
           )}
         >
@@ -65,7 +65,7 @@ export default function BottomNav() {
         <Link
           href="/settings"
           className={cn(
-            "flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-colors min-w-[60px]",
+            "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-xl transition-colors",
             pathname === "/settings" ? "text-accent" : "text-text-secondary"
           )}
         >
