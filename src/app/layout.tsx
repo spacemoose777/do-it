@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { FontSizeProvider } from "@/contexts/FontSizeContext";
+import UpdatePrompt from "@/components/layout/UpdatePrompt";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
           <AuthProvider>
             <ToastProvider>
               {children}
+              <UpdatePrompt />
             </ToastProvider>
           </AuthProvider>
         </FontSizeProvider>
