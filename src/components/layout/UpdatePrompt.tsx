@@ -44,7 +44,7 @@ export default function UpdatePrompt() {
   if (!waitingSW) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-surface px-4 py-3 shadow-lg">
+    <div className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-surface px-4 py-3 shadow-lg">
       <span className="text-sm text-secondary">Update available</span>
       <button
         onClick={applyUpdate}
