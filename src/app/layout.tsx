@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { FontSizeProvider } from "@/contexts/FontSizeContext";
+import { PWAInstallProvider } from "@/contexts/PWAInstallContext";
 import UpdatePrompt from "@/components/layout/UpdatePrompt";
 import "./globals.css";
 
@@ -36,12 +37,14 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen overflow-x-hidden">
         <FontSizeProvider>
-          <AuthProvider>
-            <ToastProvider>
-              {children}
-              <UpdatePrompt />
-            </ToastProvider>
-          </AuthProvider>
+          <PWAInstallProvider>
+            <AuthProvider>
+              <ToastProvider>
+                {children}
+                <UpdatePrompt />
+              </ToastProvider>
+            </AuthProvider>
+          </PWAInstallProvider>
         </FontSizeProvider>
       </body>
     </html>

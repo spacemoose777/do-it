@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useFontSize, type FontSize } from "@/contexts/FontSizeContext";
+import { usePWAInstall } from "@/contexts/PWAInstallContext";
 import { clearAllData } from "@/lib/db/indexed-db";
 import Header from "@/components/layout/Header";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const { lastSyncedAt, pendingCount, triggerSync, isSyncing } = useSync();
   const isOnline = useOnlineStatus();
   const { fontSize, setFontSize } = useFontSize();
+  const { canInstall, install } = usePWAInstall();
 
   const handleClearLocal = async () => {
     if (confirm("This will clear all local data. Your data will be re-synced from the server on next load. Continue?")) {
@@ -50,6 +52,19 @@ export default function SettingsPage() {
             Sign Out
           </button>
         </section>
+
+        {/* Install */}
+        {canInstall && (
+          <section className="card p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-text-primary">Install</h2>
+            <button onClick={install} className="btn-primary w-full text-sm">
+              Add to Home Screen
+            </button>
+            <p className="text-xs text-text-secondary">
+              Install Do It on your device for the best experience.
+            </p>
+          </section>
+        )}
 
         {/* Appearance */}
         <section className="card p-5 space-y-3">
