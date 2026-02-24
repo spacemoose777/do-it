@@ -40,17 +40,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No sender email" }, { status: 400 });
   }
 
-  console.log("[email-webhook] sender:", senderEmail, "subject:", subject);
-
   // Look up Firebase user by email
   let userId: string;
   try {
     const adminAuth = getAdminAuth();
     const userRecord = await adminAuth.getUserByEmail(senderEmail);
     userId = userRecord.uid;
-    console.log("[email-webhook] found user:", userId);
-  } catch (err) {
-    console.log("[email-webhook] user not found for email:", senderEmail, err);
+  } catch {
     // User not found — silently ignore unregistered senders
     return NextResponse.json({ ok: true, note: "sender not registered" });
   }
@@ -63,8 +59,6 @@ export async function POST(req: NextRequest) {
     .doc(userId)
     .collection("task_lists")
     .get();
-
-  console.log("[email-webhook] lists found:", listsSnap.size, "targetListId will be:", listsSnap.docs[0]?.id);
 
   const hashtags = extractHashtags(subject);
   const cleanSubject = stripHashtags(subject);
@@ -86,8 +80,6 @@ export async function POST(req: NextRequest) {
     const defaultDoc = listsSnap.docs.find((d) => d.data().is_default);
     targetListId = defaultDoc?.id || listsSnap.docs[0]?.id || null;
   }
-
-  console.log("[email-webhook] targetListId:", targetListId);
 
   if (!targetListId) {
     return NextResponse.json({ error: "No task list found for user" }, { status: 400 });
@@ -124,6 +116,5 @@ export async function POST(req: NextRequest) {
     .doc(taskId)
     .set(taskData);
 
-  console.log("[email-webhook] task created:", taskId);
   return NextResponse.json({ ok: true, taskId });
 }
