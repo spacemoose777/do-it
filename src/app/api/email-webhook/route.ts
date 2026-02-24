@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     completed_at: null,
     is_important: false,
     is_my_day: true,
-    my_day_date: now.slice(0, 10),
+    my_day_date: null,
     due_date: null,
     due_time: null,
     reminder_at: null,

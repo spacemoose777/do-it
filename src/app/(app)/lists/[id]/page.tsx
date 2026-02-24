@@ -63,12 +63,17 @@ function SingleListPage({ listId }: { listId: string }) {
     );
   }
 
+  const handleUpdate = useCallback(async (id: string, updates: any) => {
+    const updated = await updateTask(id, updates);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [updateTask, selectedTask]);
+
   if (selectedTask) {
     return (
       <div className="fixed inset-0 md:relative md:inset-auto bg-bg-primary z-30">
         <TaskDetail
           task={selectedTask}
-          onUpdate={updateTask}
+          onUpdate={handleUpdate}
           onToggleComplete={toggleComplete}
           onToggleImportant={toggleImportant}
           onToggleMyDay={toggleMyDay}

@@ -195,6 +195,7 @@ export function useTasks(filter?: {
       ...normalizedExisting,
       is_completed: isCompleting,
       completed_at: isCompleting ? now : null,
+      ...(isCompleting ? { is_my_day: false, my_day_date: null, my_day_sort_order: null } : {}),
       updated_at: now,
     };
 
