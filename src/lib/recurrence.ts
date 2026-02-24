@@ -55,7 +55,7 @@ function shiftReminder(
 export function clearStaleMyDay(tasks: Task[]): Task[] {
   const today = todayDateString();
   return tasks.map((task) => {
-    if (task.is_my_day && task.my_day_date && task.my_day_date !== today) {
+    if (task.is_my_day && task.my_day_date && task.my_day_date < today) {
       return { ...task, is_my_day: false, my_day_date: null, updated_at: nowISOString() };
     }
     return task;
