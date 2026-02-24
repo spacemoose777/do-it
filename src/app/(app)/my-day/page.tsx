@@ -5,10 +5,10 @@ import { format } from "date-fns";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
 import Header from "@/components/layout/Header";
-import TaskList from "@/components/tasks/TaskList";
 import TaskInput from "@/components/tasks/TaskInput";
 import TaskDetail from "@/components/tasks/TaskDetail";
 import SortMenu from "@/components/tasks/SortMenu";
+import DraggableTaskList from "@/components/tasks/DraggableTaskList";
 import VoiceButton from "@/components/voice/VoiceButton";
 import type { Task } from "@/types/task";
 
@@ -17,21 +17,33 @@ export default function MyDayPage() {
     myDay: true,
     includeCompleted: true,
   });
-  const { getDefaultList } = useTaskLists();
+  const { lists, getDefaultList } = useTaskLists();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const today = format(new Date(), "EEEE, MMMM d");
 
-  const handleAddTask = useCallback(async (title: string, dueDate?: string) => {
-    const defaultList = getDefaultList();
-    if (!defaultList) return;
+  const handleAddTask = useCallback(async (title: string, dueDate?: string, listName?: string) => {
+    let targetListId = getDefaultList()?.id;
+    let isMyDay = true;
+
+    if (listName) {
+      const found = lists.find(
+        (l) => l.name.toLowerCase() === listName.toLowerCase()
+      );
+      if (found) {
+        targetListId = found.id;
+        isMyDay = false;
+      }
+    }
+
+    if (!targetListId) return;
     await createTask({
       title,
-      list_id: defaultList.id,
-      is_my_day: true,
+      list_id: targetListId,
+      is_my_day: isMyDay,
       due_date: dueDate || null,
     });
-  }, [createTask, getDefaultList]);
+  }, [createTask, getDefaultList, lists]);
 
   const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task);
@@ -75,12 +87,13 @@ export default function MyDayPage() {
             <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <TaskList
+          <DraggableTaskList
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onToggleImportant={toggleImportant}
             onTaskClick={handleTaskClick}
             onDelete={deleteTask}
+            onReorder={updateTask}
             emptyMessage="Focus on what matters today. Add tasks to get started."
           />
         )}

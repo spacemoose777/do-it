@@ -1,21 +1,22 @@
 "use client";
 
-import { format, addHours, addDays, setHours, setMinutes, startOfTomorrow } from "date-fns";
-import { formatReminderDate } from "@/lib/date-utils";
+import { useState } from "react";
+import { addHours, addDays, setHours, setMinutes, startOfTomorrow } from "date-fns";
 
 interface ReminderPickerProps {
-  value: string | null;
-  onChange: (reminder: string | null) => void;
+  /** Called with an ISO string when the user picks a reminder time to add */
+  onAdd: (isoString: string) => void;
 }
 
-export default function ReminderPicker({ value, onChange }: ReminderPickerProps) {
+export default function ReminderPicker({ onAdd }: ReminderPickerProps) {
+  const [customValue, setCustomValue] = useState("");
+
   const quickOptions = [
     {
       label: "Later today",
       getDate: () => {
         const now = new Date();
-        const rounded = addHours(setMinutes(now, 0), now.getMinutes() > 30 ? 2 : 1);
-        return rounded;
+        return addHours(setMinutes(now, 0), now.getMinutes() > 30 ? 2 : 1);
       },
     },
     {
@@ -32,25 +33,22 @@ export default function ReminderPicker({ value, onChange }: ReminderPickerProps)
     },
   ];
 
+  const handleCustomAdd = () => {
+    if (customValue) {
+      onAdd(new Date(customValue).toISOString());
+      setCustomValue("");
+    }
+  };
+
   return (
     <div className="space-y-3">
-      {value && (
-        <div className="flex items-center justify-between px-3 py-2 bg-accent/10 rounded-lg">
-          <span className="text-sm text-accent">{formatReminderDate(value)}</span>
-          <button
-            onClick={() => onChange(null)}
-            className="text-xs text-danger hover:text-danger/80"
-          >
-            Remove
-          </button>
-        </div>
-      )}
+      <p className="text-xs text-text-secondary">Add a reminder</p>
 
       <div className="flex flex-wrap gap-2">
         {quickOptions.map((opt) => (
           <button
             key={opt.label}
-            onClick={() => onChange(opt.getDate().toISOString())}
+            onClick={() => onAdd(opt.getDate().toISOString())}
             className="px-3 py-1.5 text-sm rounded-lg bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
           >
             {opt.label}
@@ -58,18 +56,20 @@ export default function ReminderPicker({ value, onChange }: ReminderPickerProps)
         ))}
       </div>
 
-      <div>
-        <label className="block text-xs text-text-secondary mb-1">Custom date & time</label>
+      <div className="flex gap-2">
         <input
           type="datetime-local"
-          value={value ? format(new Date(value), "yyyy-MM-dd'T'HH:mm") : ""}
-          onChange={(e) => {
-            if (e.target.value) {
-              onChange(new Date(e.target.value).toISOString());
-            }
-          }}
-          className="input-field text-sm"
+          value={customValue}
+          onChange={(e) => setCustomValue(e.target.value)}
+          className="input-field text-sm flex-1"
         />
+        <button
+          onClick={handleCustomAdd}
+          disabled={!customValue}
+          className="btn-primary text-sm px-4 disabled:opacity-40"
+        >
+          Add
+        </button>
       </div>
     </div>
   );

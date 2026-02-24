@@ -13,7 +13,7 @@ import type { VoiceCommand } from "@/types/voice";
 
 export default function VoicePage() {
   const { tasks: myDayTasks, createTask } = useTasks({ myDay: true });
-  const { getDefaultList } = useTaskLists();
+  const { lists, getDefaultList } = useTaskLists();
   const { showToast } = useToast();
 
   const handleCommand = useCallback(async (command: VoiceCommand) => {
@@ -21,14 +21,28 @@ export default function VoicePage() {
       case "add_task":
         if (command.taskTitle) {
           const defaultList = getDefaultList();
-          if (defaultList) {
+          let targetListId = defaultList?.id;
+          let isMyDay = true;
+
+          if (command.listName) {
+            const found = lists.find(
+              (l) => l.name.toLowerCase() === command.listName!.toLowerCase()
+            );
+            if (found) {
+              targetListId = found.id;
+              isMyDay = false;
+            }
+          }
+
+          if (targetListId) {
             await createTask({
               title: command.taskTitle,
-              list_id: defaultList.id,
-              is_my_day: true,
+              list_id: targetListId,
+              is_my_day: isMyDay,
               due_date: command.dueDate || null,
             });
-            showToast(`Added: ${command.taskTitle}`, "success");
+            const listLabel = command.listName ? ` → ${command.listName}` : "";
+            showToast(`Added: ${command.taskTitle}${listLabel}`, "success");
           }
         }
         break;
@@ -43,7 +57,7 @@ export default function VoicePage() {
         }
         break;
     }
-  }, [myDayTasks, createTask, getDefaultList, showToast]);
+  }, [myDayTasks, createTask, getDefaultList, lists, showToast]);
 
   const {
     isListening,
@@ -117,6 +131,7 @@ export default function VoicePage() {
 
           <div className="text-xs text-text-secondary/60 space-y-1 mt-8">
             <p className="font-medium text-text-secondary mb-2">Voice commands:</p>
+            <p>&ldquo;Buy apples, list: Shopping&rdquo; — adds to a specific list</p>
             <p>&ldquo;Buy groceries tomorrow&rdquo; — adds task with due date</p>
             <p>&ldquo;Read my day&rdquo; — reads your tasks aloud</p>
             <p>&ldquo;What&apos;s next&rdquo; — reads the next task</p>

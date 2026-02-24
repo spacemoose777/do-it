@@ -1,4 +1,6 @@
-import { getAllTasks } from "@/lib/db/indexed-db";
+import { getAllTasks, putTask } from "@/lib/db/indexed-db";
+import { enqueue } from "@/lib/sync/sync-queue";
+import { nowISOString } from "@/lib/date-utils";
 import { showLocalNotification } from "./push-manager";
 
 let checkInterval: NodeJS.Timeout | null = null;
@@ -28,22 +30,37 @@ async function checkReminders(userId: string): Promise<void> {
     const now = new Date();
 
     for (const task of tasks) {
-      if (
-        task.reminder_at &&
-        !task.is_completed &&
-        new Date(task.reminder_at) <= now
-      ) {
-        // Show notification
+      if (task.is_completed) continue;
+
+      // Support both the new `reminders` array and the legacy `reminder_at` field
+      const allReminders: string[] = task.reminders?.length
+        ? task.reminders
+        : task.reminder_at
+          ? [task.reminder_at]
+          : [];
+
+      const dueNow = allReminders.filter((r) => new Date(r) <= now);
+      if (dueNow.length === 0) continue;
+
+      // Fire a notification for each due reminder
+      for (const r of dueNow) {
         await showLocalNotification(`Reminder: ${task.title}`, {
           body: task.notes || "You have a task reminder",
-          tag: `reminder-${task.id}`,
+          tag: `reminder-${task.id}-${r}`,
           taskId: task.id,
         });
-
-        // Clear the reminder so it doesn't fire again
-        // We don't update via the hook here to avoid circular deps
-        // The user will see the notification and can act on it
       }
+
+      // Remove fired reminders so they don't fire again on the next check
+      const remaining = allReminders.filter((r) => new Date(r) > now);
+      const updated = {
+        ...task,
+        reminders: remaining,
+        reminder_at: remaining[0] ?? null,
+        updated_at: nowISOString(),
+      };
+      await putTask(updated);
+      await enqueue("tasks", task.id, "UPDATE", updated as unknown as Record<string, unknown>);
     }
   } catch (err) {
     console.error("Reminder check failed:", err);

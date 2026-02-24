@@ -4,6 +4,14 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Font size preferences */
+html[data-font-size="large"] {
+  font-size: 112.5%; /* 18px base */
+}
+html[data-font-size="xl"] {
+  font-size: 125%; /* 20px base */
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;

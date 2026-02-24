@@ -24,8 +24,11 @@ export interface Task {
   due_date: string | null;
   due_time: string | null;
   reminder_at: string | null;
+  reminders: string[];
   recurrence_rule: RecurrenceRule | null;
   sort_order: number;
+  my_day_sort_order: number | null;
+  priority: number | null;
   created_at: string;
   updated_at: string;
 }

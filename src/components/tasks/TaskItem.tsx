@@ -15,6 +15,13 @@ interface TaskItemProps {
   showListName?: string;
 }
 
+function priorityBadgeClass(p: number): string {
+  if (p === 1) return "bg-danger text-white";
+  if (p === 2) return "bg-warning text-white";
+  if (p === 3) return "bg-accent text-white";
+  return "bg-bg-tertiary text-text-secondary";
+}
+
 export default function TaskItem({
   task,
   onToggleComplete,
@@ -23,6 +30,8 @@ export default function TaskItem({
   onDelete,
   showListName,
 }: TaskItemProps) {
+  const reminders = task.reminders ?? (task.reminder_at ? [task.reminder_at] : []);
+
   const content = (
     <div
       className={cn(
@@ -45,7 +54,12 @@ export default function TaskItem({
         >
           {task.title}
         </p>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          {task.priority !== null && task.priority !== undefined && (
+            <span className={cn("text-xs font-bold px-1.5 py-0.5 rounded leading-none", priorityBadgeClass(task.priority))}>
+              P{task.priority}
+            </span>
+          )}
           {showListName && (
             <span className="text-xs text-text-secondary">{showListName}</span>
           )}
@@ -66,10 +80,13 @@ export default function TaskItem({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.183" />
             </svg>
           )}
-          {task.reminder_at && (
-            <svg className="w-3 h-3 text-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-            </svg>
+          {reminders.length > 0 && (
+            <span className="flex items-center gap-0.5 text-xs text-text-secondary">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+              </svg>
+              {reminders.length > 1 && <span>{reminders.length}</span>}
+            </span>
           )}
           {task.is_my_day && (
             <svg className="w-3 h-3 text-warning" fill="currentColor" viewBox="0 0 24 24">

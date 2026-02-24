@@ -11,7 +11,7 @@ import type { VoiceCommand } from "@/types/voice";
 
 interface VoiceModalProps {
   onClose: () => void;
-  onTaskAdded: (title: string, dueDate?: string) => void;
+  onTaskAdded: (title: string, dueDate?: string, listName?: string) => void;
 }
 
 export default function VoiceModal({ onClose, onTaskAdded }: VoiceModalProps) {
@@ -21,7 +21,7 @@ export default function VoiceModal({ onClose, onTaskAdded }: VoiceModalProps) {
     switch (command.type) {
       case "add_task":
         if (command.taskTitle) {
-          onTaskAdded(command.taskTitle, command.dueDate);
+          onTaskAdded(command.taskTitle, command.dueDate, command.listName);
         }
         break;
       case "read_my_day":
@@ -139,6 +139,7 @@ export default function VoiceModal({ onClose, onTaskAdded }: VoiceModalProps) {
             {/* Hints */}
             <div className="text-xs text-text-secondary/60 space-y-1">
               <p>Try saying:</p>
+              <p>&ldquo;Buy apples, list: Shopping&rdquo;</p>
               <p>&ldquo;Buy groceries tomorrow&rdquo;</p>
               <p>&ldquo;Read my day&rdquo;</p>
               <p>&ldquo;What&apos;s next&rdquo;</p>

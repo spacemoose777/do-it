@@ -1,16 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useFontSize, type FontSize } from "@/contexts/FontSizeContext";
 import { clearAllData } from "@/lib/db/indexed-db";
 import Header from "@/components/layout/Header";
+import { cn } from "@/lib/utils";
+
+const FONT_SIZE_OPTIONS: { value: FontSize; label: string; example: string }[] = [
+  { value: "normal", label: "Normal", example: "Aa" },
+  { value: "large", label: "Large", example: "Aa" },
+  { value: "xl", label: "Extra Large", example: "Aa" },
+];
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { lastSyncedAt, pendingCount, triggerSync, isSyncing } = useSync();
   const isOnline = useOnlineStatus();
+  const { fontSize, setFontSize } = useFontSize();
 
   const handleClearLocal = async () => {
     if (confirm("This will clear all local data. Your data will be re-synced from the server on next load. Continue?")) {
@@ -41,6 +49,40 @@ export default function SettingsPage() {
           <button onClick={handleSignOut} className="btn-danger w-full text-sm">
             Sign Out
           </button>
+        </section>
+
+        {/* Appearance */}
+        <section className="card p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-text-primary">Appearance</h2>
+          <div>
+            <p className="text-xs text-text-secondary mb-2">Text size</p>
+            <div className="flex gap-2">
+              {FONT_SIZE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setFontSize(opt.value)}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-lg border transition-colors",
+                    fontSize === opt.value
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "font-semibold leading-none",
+                      opt.value === "normal" && "text-base",
+                      opt.value === "large" && "text-lg",
+                      opt.value === "xl" && "text-xl"
+                    )}
+                  >
+                    {opt.example}
+                  </span>
+                  <span className="text-xs">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* Sync */}

@@ -8,6 +8,7 @@ export const SORT_OPTIONS = [
   { value: "due_date", label: "Due date" },
   { value: "title", label: "Alphabetical" },
   { value: "is_important", label: "Importance" },
+  { value: "priority", label: "Priority" },
 ] as const;
 
 export const RECURRENCE_PRESETS = [

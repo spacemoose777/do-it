@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import VoiceModal from "./VoiceModal";
 
 interface VoiceButtonProps {
-  onTaskAdded: (title: string, dueDate?: string) => void;
+  onTaskAdded: (title: string, dueDate?: string, listName?: string) => void;
 }
 
 export default function VoiceButton({ onTaskAdded }: VoiceButtonProps) {

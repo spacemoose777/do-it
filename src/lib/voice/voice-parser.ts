@@ -21,6 +21,27 @@ const ADD_PATTERNS = [
   /^(i\s*need\s*to)\s+(.+)/i,
 ];
 
+// Extract "list: <name>" or "in <name> list" from the end of the text
+function extractListName(text: string): { text: string; listName?: string } {
+  // Match ", list: <name>" or " list: <name>" at end
+  const colonPattern = /,?\s*list:\s*([^,]+?)\s*$/i;
+  const colonMatch = text.match(colonPattern);
+  if (colonMatch) {
+    const cleaned = text.slice(0, text.length - colonMatch[0].length).trim();
+    return { text: cleaned || text, listName: colonMatch[1].trim() };
+  }
+
+  // Match " in <name> list" at end
+  const inListPattern = /\s+in\s+(.+?)\s+list\s*$/i;
+  const inMatch = text.match(inListPattern);
+  if (inMatch) {
+    const cleaned = text.replace(inMatch[0], "").trim();
+    return { text: cleaned || text, listName: inMatch[1].trim() };
+  }
+
+  return { text };
+}
+
 export function parseVoiceInput(rawText: string): VoiceCommand {
   const text = rawText.trim();
 
@@ -53,10 +74,13 @@ export function parseVoiceInput(rawText: string): VoiceCommand {
 }
 
 function parseTaskText(taskText: string, rawText: string): VoiceCommand {
-  // Use chrono to extract dates from natural language
-  const parsed = chrono.parse(taskText, new Date(), { forwardDate: true });
+  // Extract list name if present
+  const { text: textWithoutList, listName } = extractListName(taskText);
 
-  let title = taskText;
+  // Use chrono to extract dates from natural language
+  const parsed = chrono.parse(textWithoutList, new Date(), { forwardDate: true });
+
+  let title = textWithoutList;
   let dueDate: string | undefined;
 
   if (parsed.length > 0) {
@@ -65,7 +89,7 @@ function parseTaskText(taskText: string, rawText: string): VoiceCommand {
     dueDate = format(dateStr, "yyyy-MM-dd");
 
     // Remove the date text from the title
-    title = taskText
+    title = textWithoutList
       .replace(result.text, "")
       .replace(/\s+/g, " ")
       .trim();
@@ -79,7 +103,7 @@ function parseTaskText(taskText: string, rawText: string): VoiceCommand {
 
   // If we stripped the date and there's nothing left, use original text
   if (!title) {
-    title = taskText;
+    title = textWithoutList;
   }
 
   // Capitalize first letter
@@ -90,5 +114,6 @@ function parseTaskText(taskText: string, rawText: string): VoiceCommand {
     rawText,
     taskTitle: title,
     dueDate,
+    listName,
   };
 }

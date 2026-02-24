@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { formatFullDate, formatTime, getRecurrenceLabel } from "@/lib/date-utils";
+import { formatFullDate, formatTime, getRecurrenceLabel, formatReminderDate } from "@/lib/date-utils";
 import Checkbox from "@/components/ui/Checkbox";
 import DatePicker from "@/components/ui/DatePicker";
 import TimePicker from "@/components/ui/TimePicker";
 import RecurrencePicker from "./RecurrencePicker";
 import ReminderPicker from "./ReminderPicker";
 import SubtaskList from "./SubtaskList";
-import type { Task, TaskUpdateInput, RecurrenceRule } from "@/types/task";
+import type { Task, TaskUpdateInput } from "@/types/task";
 
 interface TaskDetailProps {
   task: Task;
@@ -20,6 +20,13 @@ interface TaskDetailProps {
   onDelete: (id: string) => void;
   onClose: () => void;
 }
+
+const PRIORITY_OPTIONS = [
+  { value: 1, label: "P1", description: "Urgent", activeClass: "bg-danger text-white border-danger" },
+  { value: 2, label: "P2", description: "High", activeClass: "bg-warning text-white border-warning" },
+  { value: 3, label: "P3", description: "Medium", activeClass: "bg-accent text-white border-accent" },
+  { value: 4, label: "P4", description: "Low", activeClass: "bg-bg-tertiary text-text-primary border-border" },
+];
 
 export default function TaskDetail({
   task,
@@ -37,6 +44,8 @@ export default function TaskDetail({
   const [showRecurrence, setShowRecurrence] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
 
+  const reminders = task.reminders ?? (task.reminder_at ? [task.reminder_at] : []);
+
   useEffect(() => {
     setTitle(task.title);
     setNotes(task.notes);
@@ -52,6 +61,16 @@ export default function TaskDetail({
     if (notes !== task.notes) {
       onUpdate(task.id, { notes });
     }
+  };
+
+  const handleAddReminder = (isoString: string) => {
+    const updated = [...reminders, isoString];
+    onUpdate(task.id, { reminders: updated, reminder_at: updated[0] || null });
+  };
+
+  const handleRemoveReminder = (index: number) => {
+    const updated = reminders.filter((_, i) => i !== index);
+    onUpdate(task.id, { reminders: updated, reminder_at: updated[0] || null });
   };
 
   return (
@@ -126,6 +145,29 @@ export default function TaskDetail({
           </button>
         </div>
 
+        {/* Priority */}
+        <div>
+          <p className="text-xs text-text-secondary mb-2">Priority</p>
+          <div className="flex gap-2 flex-wrap">
+            {PRIORITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onUpdate(task.id, { priority: task.priority === opt.value ? null : opt.value })}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors",
+                  task.priority === opt.value
+                    ? opt.activeClass
+                    : "bg-bg-tertiary text-text-secondary border-border hover:text-text-primary"
+                )}
+                title={opt.description}
+              >
+                <span className="font-semibold">{opt.label}</span>
+                <span className="text-xs opacity-80">{opt.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Subtasks */}
         <SubtaskList taskId={task.id} />
 
@@ -173,7 +215,7 @@ export default function TaskDetail({
           </div>
         )}
 
-        {/* Reminder */}
+        {/* Reminders (multiple) */}
         <div>
           <button
             onClick={() => setShowReminder(!showReminder)}
@@ -182,14 +224,31 @@ export default function TaskDetail({
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
             </svg>
-            {task.reminder_at ? "Reminder set" : "Add reminder"}
+            {reminders.length > 0
+              ? `${reminders.length} reminder${reminders.length > 1 ? "s" : ""} set`
+              : "Add reminder"}
           </button>
+
+          {/* Existing reminders */}
+          {reminders.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {reminders.map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2 bg-accent/10 rounded-lg">
+                  <span className="text-sm text-accent">{formatReminderDate(r)}</span>
+                  <button
+                    onClick={() => handleRemoveReminder(i)}
+                    className="text-xs text-danger hover:text-danger/80 ml-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {showReminder && (
             <div className="mt-2">
-              <ReminderPicker
-                value={task.reminder_at}
-                onChange={(reminder) => onUpdate(task.id, { reminder_at: reminder })}
-              />
+              <ReminderPicker onAdd={handleAddReminder} />
             </div>
           )}
         </div>
