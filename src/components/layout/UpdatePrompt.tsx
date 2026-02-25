@@ -39,13 +39,14 @@ export default function UpdatePrompt() {
   function applyUpdate() {
     if (!waitingSW) return;
     waitingSW.postMessage("SKIP_WAITING");
+    window.location.reload();
   }
 
   if (!waitingSW) return null;
 
   return (
-    <div className="fixed top-4 left-4 right-4 z-50 flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-surface px-4 py-3 shadow-lg">
-      <span className="text-sm text-secondary">Update available</span>
+    <div className="fixed top-4 left-4 right-4 z-[9999] flex items-center justify-between gap-3 rounded-xl border border-accent/30 bg-bg-secondary px-4 py-3 shadow-lg">
+      <span className="text-sm text-text-secondary">Update available</span>
       <button
         onClick={applyUpdate}
         className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
