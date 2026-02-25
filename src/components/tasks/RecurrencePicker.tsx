@@ -13,7 +13,7 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function RecurrencePicker({ value, onChange }: RecurrencePickerProps) {
   const [showCustom, setShowCustom] = useState(false);
-  const [customInterval, setCustomInterval] = useState(value?.interval || 1);
+  const [customInterval, setCustomInterval] = useState(String(value?.interval || 1));
   const [customDays, setCustomDays] = useState<number[]>(value?.daysOfWeek || []);
 
   const handlePreset = (type: string) => {
@@ -31,7 +31,7 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
   const handleCustomSave = () => {
     onChange({
       type: "custom",
-      interval: customInterval,
+      interval: Math.max(1, parseInt(customInterval) || 1),
       daysOfWeek: customDays.length > 0 ? customDays : undefined,
     });
     setShowCustom(false);
@@ -78,7 +78,10 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
               min={1}
               max={365}
               value={customInterval}
-              onChange={(e) => setCustomInterval(parseInt(e.target.value) || 1)}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "" || /^\d+$/.test(raw)) setCustomInterval(raw);
+              }}
               className="w-16 input-field text-center text-sm"
             />
             <span className="text-sm text-text-secondary">days</span>
