@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { format } from "date-fns";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
+import { useTaskPanel } from "@/hooks/useTaskPanel";
 import Header from "@/components/layout/Header";
 import TaskInput from "@/components/tasks/TaskInput";
 import TaskDetail from "@/components/tasks/TaskDetail";
@@ -13,12 +14,13 @@ import VoiceButton from "@/components/voice/VoiceButton";
 import type { Task } from "@/types/task";
 
 export default function MyDayPage() {
-  const { tasks, loading, sortBy, setSortBy, createTask, updateTask, toggleComplete, toggleImportant, toggleMyDay, deleteTask } = useTasks({
-    myDay: true,
-    includeCompleted: true,
-  });
+  const {
+    tasks, loading, sortBy, setSortBy,
+    createTask, updateTask, toggleComplete, toggleImportant,
+    toggleMyDay, toggleInProgress, deleteTask,
+  } = useTasks({ myDay: true });
   const { lists, getDefaultList } = useTaskLists();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
 
   const today = format(new Date(), "EEEE, MMMM d");
 
@@ -27,9 +29,7 @@ export default function MyDayPage() {
     let isMyDay = true;
 
     if (listName) {
-      const found = lists.find(
-        (l) => l.name.toLowerCase() === listName.toLowerCase()
-      );
+      const found = lists.find((l) => l.name.toLowerCase() === listName.toLowerCase());
       if (found) {
         targetListId = found.id;
         isMyDay = false;
@@ -37,22 +37,23 @@ export default function MyDayPage() {
     }
 
     if (!targetListId) return;
-    await createTask({
-      title,
-      list_id: targetListId,
-      is_my_day: isMyDay,
-      due_date: dueDate || null,
-    });
+    await createTask({ title, list_id: targetListId, is_my_day: isMyDay, due_date: dueDate || null });
   }, [createTask, getDefaultList, lists]);
 
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
-  }, [updateTask, selectedTask]);
+  }, [updateTask, selectedTask, setSelectedTask]);
 
-  const handleTaskClick = useCallback((task: Task) => {
-    setSelectedTask(task);
-  }, []);
+  const handleToggleMyDay = useCallback(async (id: string) => {
+    const updated = await toggleMyDay(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleMyDay, selectedTask, setSelectedTask]);
+
+  const handleToggleInProgress = useCallback(async (id: string) => {
+    const updated = await toggleInProgress(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleInProgress, selectedTask, setSelectedTask]);
 
   if (selectedTask) {
     return (
@@ -62,12 +63,10 @@ export default function MyDayPage() {
           onUpdate={handleUpdate}
           onToggleComplete={toggleComplete}
           onToggleImportant={toggleImportant}
-          onToggleMyDay={toggleMyDay}
-          onDelete={(id) => {
-            deleteTask(id);
-            setSelectedTask(null);
-          }}
-          onClose={() => setSelectedTask(null)}
+          onToggleMyDay={handleToggleMyDay}
+          onToggleInProgress={handleToggleInProgress}
+          onDelete={(id) => { deleteTask(id); closeTask(); }}
+          onClose={closeTask}
         />
       </div>
     );
@@ -82,10 +81,7 @@ export default function MyDayPage() {
       />
 
       <div className="space-y-4">
-        <TaskInput
-          onAdd={handleAddTask}
-          placeholder="Add a task to My Day"
-        />
+        <TaskInput onAdd={handleAddTask} placeholder="Add a task to My Day" />
 
         {loading ? (
           <div className="flex justify-center py-8">
@@ -96,7 +92,8 @@ export default function MyDayPage() {
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onToggleImportant={toggleImportant}
-            onTaskClick={handleTaskClick}
+            onToggleInProgress={handleToggleInProgress}
+            onTaskClick={openTask}
             onDelete={deleteTask}
             onReorder={updateTask}
             emptyMessage="Focus on what matters today. Add tasks to get started."

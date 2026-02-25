@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/contexts/AuthContext";
 import * as idb from "@/lib/db/indexed-db";
 import { enqueue } from "@/lib/sync/sync-queue";
-import { nowISOString, todayDateString } from "@/lib/date-utils";
+import { nowISOString, todayDateString, tomorrowDateString } from "@/lib/date-utils";
 import { createNextRecurringTask, clearStaleMyDay } from "@/lib/recurrence";
 import type { Task, TaskCreateInput, TaskUpdateInput } from "@/types/task";
 
@@ -19,12 +19,14 @@ function normalizeTask(task: Task): Task {
     reminders,
     priority: task.priority ?? null,
     my_day_sort_order: task.my_day_sort_order ?? null,
+    is_in_progress: task.is_in_progress ?? false,
   };
 }
 
 export function useTasks(filter?: {
   listId?: string;
   myDay?: boolean;
+  dueTomorrow?: boolean;
   important?: boolean;
   planned?: boolean;
   includeCompleted?: boolean;
@@ -33,6 +35,21 @@ export function useTasks(filter?: {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
+
+  // Re-apply active filters inline so UI stays consistent without a full reload
+  const applyFilter = useCallback((taskList: Task[]): Task[] => {
+    let result = taskList;
+    if (filter?.myDay) result = result.filter((t) => t.is_my_day);
+    if (filter?.dueTomorrow) {
+      const tomorrow = tomorrowDateString();
+      result = result.filter((t) => t.due_date === tomorrow);
+    }
+    if (filter?.important) result = result.filter((t) => t.is_important);
+    if (filter?.planned) result = result.filter((t) => t.due_date !== null);
+    if (!filter?.includeCompleted) result = result.filter((t) => !t.is_completed);
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter?.myDay, filter?.dueTomorrow, filter?.important, filter?.planned, filter?.includeCompleted]);
 
   const loadTasks = useCallback(async () => {
     if (!user) return;
@@ -58,23 +75,46 @@ export function useTasks(filter?: {
     }
     data = cleaned;
 
+    // Auto-add tasks due today to My Day (placed at the top)
+    const today = todayDateString();
+    const toAutoAdd = data.filter(
+      (t) => t.due_date === today && !t.is_my_day && !t.is_completed
+    );
+    if (toAutoAdd.length > 0) {
+      const myDayTasks = data.filter((t) => t.is_my_day);
+      const minExistingOrder =
+        myDayTasks.length === 0
+          ? 0
+          : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+      let nextOrder = minExistingOrder - toAutoAdd.length;
+      for (const task of toAutoAdd) {
+        const updatedTask: Task = {
+          ...task,
+          is_my_day: true,
+          my_day_date: today,
+          my_day_sort_order: nextOrder++,
+          updated_at: nowISOString(),
+        };
+        data = data.map((t) => (t.id === task.id ? updatedTask : t));
+        await idb.putTask(updatedTask);
+        await enqueue("tasks", task.id, "UPDATE", updatedTask as unknown as Record<string, unknown>);
+      }
+    }
+
     // Apply filters
-    if (filter?.myDay) {
-      data = data.filter((t) => t.is_my_day);
+    if (filter?.myDay) data = data.filter((t) => t.is_my_day);
+    if (filter?.dueTomorrow) {
+      const tomorrow = tomorrowDateString();
+      data = data.filter((t) => t.due_date === tomorrow);
     }
-    if (filter?.important) {
-      data = data.filter((t) => t.is_important);
-    }
-    if (filter?.planned) {
-      data = data.filter((t) => t.due_date !== null);
-    }
-    if (!filter?.includeCompleted) {
-      data = data.filter((t) => !t.is_completed);
-    }
+    if (filter?.important) data = data.filter((t) => t.is_important);
+    if (filter?.planned) data = data.filter((t) => t.due_date !== null);
+    if (!filter?.includeCompleted) data = data.filter((t) => !t.is_completed);
 
     setTasks(data);
     setLoading(false);
-  }, [user, filter?.listId, filter?.myDay, filter?.important, filter?.planned, filter?.includeCompleted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, filter?.listId, filter?.myDay, filter?.dueTomorrow, filter?.important, filter?.planned, filter?.includeCompleted]);
 
   useEffect(() => {
     loadTasks();
@@ -110,7 +150,6 @@ export function useTasks(filter?: {
         sorted.sort((a, b) => b.created_at.localeCompare(a.created_at));
         break;
     }
-    // Always show completed at the bottom
     sorted.sort((a, b) => (a.is_completed ? 1 : 0) - (b.is_completed ? 1 : 0));
     return sorted;
   }, [tasks, sortBy]);
@@ -119,11 +158,12 @@ export function useTasks(filter?: {
     if (!user) return null;
     const now = nowISOString();
 
-    // Assign my_day_sort_order for My Day tasks so they can be drag-reordered
+    // Place My Day tasks at the top of the list
     let myDaySortOrder: number | null = null;
     if (input.is_my_day) {
       const myDayTasks = tasks.filter((t) => t.is_my_day && !t.is_completed);
-      myDaySortOrder = myDayTasks.length;
+      const minOrder = myDayTasks.length === 0 ? 0 : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+      myDaySortOrder = minOrder - 1;
     }
 
     const newTask: Task = {
@@ -135,6 +175,7 @@ export function useTasks(filter?: {
       is_completed: false,
       completed_at: null,
       is_important: input.is_important || false,
+      is_in_progress: input.is_in_progress || false,
       is_my_day: input.is_my_day || false,
       my_day_date: input.is_my_day ? todayDateString() : null,
       due_date: input.due_date || null,
@@ -161,13 +202,15 @@ export function useTasks(filter?: {
 
     const normalizedExisting = normalizeTask(existing);
 
-    // Handle My Day toggle
+    // Handle My Day toggle: place at top when adding
     if (updates.is_my_day !== undefined) {
       updates.my_day_date = updates.is_my_day ? todayDateString() : null;
-      if (updates.is_my_day && normalizedExisting.my_day_sort_order === null) {
-        // Assign sort order at the end
-        const maxOrder = Math.max(0, ...tasks.filter((t) => t.is_my_day).map((t) => t.my_day_sort_order ?? 0));
-        updates.my_day_sort_order = maxOrder + 1;
+      if (updates.is_my_day) {
+        const myDayTasks = tasks.filter((t) => t.is_my_day);
+        const minOrder = myDayTasks.length === 0 ? 0 : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+        updates.my_day_sort_order = minOrder - 1;
+      } else {
+        updates.my_day_sort_order = null;
       }
     }
 
@@ -179,9 +222,9 @@ export function useTasks(filter?: {
 
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
-    setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
     return updated;
-  }, [tasks]);
+  }, [tasks, applyFilter]);
 
   const toggleComplete = useCallback(async (id: string) => {
     const existing = await idb.getTask(id);
@@ -209,13 +252,13 @@ export function useTasks(filter?: {
         const normalizedNext = normalizeTask(nextTask as Task);
         await idb.putTask(normalizedNext);
         await enqueue("tasks", normalizedNext.id, "INSERT", normalizedNext as unknown as Record<string, unknown>);
-        setTasks((prev) => [normalizedNext, ...prev.map((t) => (t.id === id ? updated : t))]);
+        setTasks((prev) => applyFilter([normalizedNext, ...prev.map((t) => (t.id === id ? updated : t))]));
         return;
       }
     }
 
-    setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
-  }, []);
+    setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+  }, [applyFilter]);
 
   const toggleImportant = useCallback(async (id: string) => {
     const existing = await idb.getTask(id);
@@ -230,8 +273,8 @@ export function useTasks(filter?: {
 
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
-    setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
-  }, []);
+    setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+  }, [applyFilter]);
 
   const toggleMyDay = useCallback(async (id: string) => {
     const existing = await idb.getTask(id);
@@ -240,24 +283,44 @@ export function useTasks(filter?: {
     const normalizedExisting = normalizeTask(existing);
     const addingToMyDay = !normalizedExisting.is_my_day;
 
-    let myDaySortOrder = normalizedExisting.my_day_sort_order;
-    if (addingToMyDay && myDaySortOrder === null) {
-      const maxOrder = Math.max(0, ...tasks.filter((t) => t.is_my_day).map((t) => t.my_day_sort_order ?? 0));
-      myDaySortOrder = maxOrder + 1;
+    // Place at top of My Day when adding
+    let myDaySortOrder: number | null = null;
+    if (addingToMyDay) {
+      const myDayTasks = tasks.filter((t) => t.is_my_day);
+      const minOrder = myDayTasks.length === 0 ? 0 : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+      myDaySortOrder = minOrder - 1;
     }
 
     const updated: Task = {
       ...normalizedExisting,
       is_my_day: addingToMyDay,
       my_day_date: addingToMyDay ? todayDateString() : null,
-      my_day_sort_order: addingToMyDay ? myDaySortOrder : null,
+      my_day_sort_order: myDaySortOrder,
+      updated_at: nowISOString(),
+    };
+
+    await idb.putTask(updated);
+    await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
+    setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+    return updated;
+  }, [tasks, applyFilter]);
+
+  const toggleInProgress = useCallback(async (id: string) => {
+    const existing = await idb.getTask(id);
+    if (!existing) return;
+
+    const normalizedExisting = normalizeTask(existing);
+    const updated: Task = {
+      ...normalizedExisting,
+      is_in_progress: !normalizedExisting.is_in_progress,
       updated_at: nowISOString(),
     };
 
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
     setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
-  }, [tasks]);
+    return updated;
+  }, []);
 
   const deleteTask = useCallback(async (id: string) => {
     await idb.deleteTask(id);
@@ -275,6 +338,7 @@ export function useTasks(filter?: {
     toggleComplete,
     toggleImportant,
     toggleMyDay,
+    toggleInProgress,
     deleteTask,
     refresh: loadTasks,
   };

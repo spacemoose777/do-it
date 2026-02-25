@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { format, parseISO, isToday, isTomorrow, isThisWeek, isPast, startOfDay } from "date-fns";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
+import { useTaskPanel } from "@/hooks/useTaskPanel";
 import Header from "@/components/layout/Header";
 import TaskItem from "@/components/tasks/TaskItem";
 import TaskInput from "@/components/tasks/TaskInput";
@@ -17,12 +18,13 @@ type DateGroup = {
 };
 
 export default function PlannedPage() {
-  const { tasks, loading, createTask, updateTask, toggleComplete, toggleImportant, toggleMyDay, deleteTask } = useTasks({
-    planned: true,
-    includeCompleted: false,
-  });
+  const {
+    tasks, loading,
+    createTask, updateTask, toggleComplete, toggleImportant,
+    toggleMyDay, toggleInProgress, deleteTask,
+  } = useTasks({ planned: true, includeCompleted: false });
   const { lists, getDefaultList } = useTaskLists();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
 
   const groups = useMemo((): DateGroup[] => {
     const overdue: Task[] = [];
@@ -61,11 +63,7 @@ export default function PlannedPage() {
   const handleAddTask = useCallback(async (title: string, dueDate?: string) => {
     const defaultList = getDefaultList();
     if (!defaultList) return;
-    await createTask({
-      title,
-      list_id: defaultList.id,
-      due_date: dueDate || format(new Date(), "yyyy-MM-dd"),
-    });
+    await createTask({ title, list_id: defaultList.id, due_date: dueDate || format(new Date(), "yyyy-MM-dd") });
   }, [createTask, getDefaultList]);
 
   const getListName = useCallback((task: Task) => {
@@ -75,7 +73,17 @@ export default function PlannedPage() {
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
-  }, [updateTask, selectedTask]);
+  }, [updateTask, selectedTask, setSelectedTask]);
+
+  const handleToggleMyDay = useCallback(async (id: string) => {
+    const updated = await toggleMyDay(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleMyDay, selectedTask, setSelectedTask]);
+
+  const handleToggleInProgress = useCallback(async (id: string) => {
+    const updated = await toggleInProgress(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleInProgress, selectedTask, setSelectedTask]);
 
   if (selectedTask) {
     return (
@@ -85,12 +93,10 @@ export default function PlannedPage() {
           onUpdate={handleUpdate}
           onToggleComplete={toggleComplete}
           onToggleImportant={toggleImportant}
-          onToggleMyDay={toggleMyDay}
-          onDelete={(id) => {
-            deleteTask(id);
-            setSelectedTask(null);
-          }}
-          onClose={() => setSelectedTask(null)}
+          onToggleMyDay={handleToggleMyDay}
+          onToggleInProgress={handleToggleInProgress}
+          onDelete={(id) => { deleteTask(id); closeTask(); }}
+          onClose={closeTask}
         />
       </div>
     );
@@ -128,7 +134,8 @@ export default function PlannedPage() {
                       task={task}
                       onToggleComplete={toggleComplete}
                       onToggleImportant={toggleImportant}
-                      onClick={setSelectedTask}
+                      onToggleInProgress={handleToggleInProgress}
+                      onClick={openTask}
                       onDelete={deleteTask}
                       showListName={getListName(task)}
                     />

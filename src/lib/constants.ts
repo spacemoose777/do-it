@@ -35,5 +35,6 @@ export const NAV_ITEMS = [
   { href: "/my-day", label: "My Day", icon: "sun" },
   { href: "/important", label: "Important", icon: "star" },
   { href: "/planned", label: "Planned", icon: "calendar" },
+  { href: "/due-tomorrow", label: "Tomorrow", icon: "clock" },
   { href: "/all", label: "All Tasks", icon: "inbox" },
 ] as const;

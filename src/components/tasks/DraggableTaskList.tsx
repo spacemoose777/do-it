@@ -9,6 +9,7 @@ interface DraggableTaskListProps {
   tasks: Task[];
   onToggleComplete: (id: string) => void;
   onToggleImportant: (id: string) => void;
+  onToggleInProgress: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onDelete: (id: string) => void;
   onReorder: (id: string, updates: TaskUpdateInput) => void;
@@ -19,6 +20,7 @@ export default function DraggableTaskList({
   tasks,
   onToggleComplete,
   onToggleImportant,
+  onToggleInProgress,
   onTaskClick,
   onDelete,
   onReorder,
@@ -44,6 +46,7 @@ export default function DraggableTaskList({
   const draggingIdRef = useRef<string | null>(null);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
 
   // Sync local order when the incoming tasks list changes (not during a drag)
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function DraggableTaskList({
     [localOrder]
   );
 
-  // Add a non-passive touchmove listener so we can call preventDefault during drag
+  // Non-passive touchmove to prevent page scroll during drag
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -95,7 +98,6 @@ export default function DraggableTaskList({
           const [moved] = newOrder.splice(fromIndex, 1);
           newOrder.splice(finalDropIndex, 0, moved);
           setLocalOrder(newOrder);
-          // Persist new sort orders
           newOrder.forEach((task, idx) => {
             onReorder(task.id, { my_day_sort_order: idx });
           });
@@ -110,18 +112,31 @@ export default function DraggableTaskList({
     [localOrder, onReorder]
   );
 
-  const handleHandleTouchStart = useCallback((taskId: string, e: React.TouchEvent) => {
+  // Long-press anywhere on the task row starts the drag (400 ms)
+  const handleRowTouchStart = useCallback((taskId: string, e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
 
-    // Long-press to begin drag (150 ms)
     dragTimerRef.current = setTimeout(() => {
       isDragging.current = true;
       draggingIdRef.current = taskId;
       setDraggingId(taskId);
-    }, 150);
+    }, 400);
   }, []);
 
-  const handleHandleTouchEnd = useCallback(
+  const handleRowTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current && dragTimerRef.current) {
+      const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+      const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+      // Cancel long-press if finger moves more than 8 px
+      if (dy > 8 || dx > 8) {
+        clearTimeout(dragTimerRef.current);
+        dragTimerRef.current = null;
+      }
+    }
+  }, []);
+
+  const handleRowTouchEnd = useCallback(
     (e: React.TouchEvent) => {
       if (dragTimerRef.current) {
         clearTimeout(dragTimerRef.current);
@@ -134,16 +149,6 @@ export default function DraggableTaskList({
     },
     [commitDrop, dropIndex]
   );
-
-  // Cancel drag if finger moves too much before the long-press fires
-  const handleHandleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current && dragTimerRef.current) {
-      if (Math.abs(e.touches[0].clientY - touchStartY.current) > 6) {
-        clearTimeout(dragTimerRef.current);
-        dragTimerRef.current = null;
-      }
-    }
-  }, []);
 
   if (tasks.length === 0) {
     return (
@@ -170,38 +175,22 @@ export default function DraggableTaskList({
               else itemEls.current.delete(task.id);
             }}
             className={cn(
-              "flex items-center relative transition-opacity duration-100",
+              "relative transition-opacity duration-100",
               isDraggingThis && "opacity-40",
               isDropTarget && "border-t-2 border-accent"
             )}
+            onTouchStart={(e) => handleRowTouchStart(task.id, e)}
+            onTouchMove={handleRowTouchMove}
+            onTouchEnd={handleRowTouchEnd}
           >
-            {/* Drag handle — touching here starts drag */}
-            <div
-              className="flex-shrink-0 px-2 py-4 touch-none cursor-grab active:cursor-grabbing text-text-secondary/25 hover:text-text-secondary/60 transition-colors"
-              onTouchStart={(e) => handleHandleTouchStart(task.id, e)}
-              onTouchMove={handleHandleTouchMove}
-              onTouchEnd={handleHandleTouchEnd}
-              aria-label="Drag to reorder"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <circle cx="7" cy="4" r="1.5" />
-                <circle cx="7" cy="10" r="1.5" />
-                <circle cx="7" cy="16" r="1.5" />
-                <circle cx="13" cy="4" r="1.5" />
-                <circle cx="13" cy="10" r="1.5" />
-                <circle cx="13" cy="16" r="1.5" />
-              </svg>
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <TaskItem
-                task={task}
-                onToggleComplete={onToggleComplete}
-                onToggleImportant={onToggleImportant}
-                onClick={onTaskClick}
-                onDelete={onDelete}
-              />
-            </div>
+            <TaskItem
+              task={task}
+              onToggleComplete={onToggleComplete}
+              onToggleImportant={onToggleImportant}
+              onToggleInProgress={onToggleInProgress}
+              onClick={onTaskClick}
+              onDelete={onDelete}
+            />
           </div>
         );
       })}
@@ -218,6 +207,7 @@ export default function DraggableTaskList({
                 task={task}
                 onToggleComplete={onToggleComplete}
                 onToggleImportant={onToggleImportant}
+                onToggleInProgress={onToggleInProgress}
                 onClick={onTaskClick}
                 onDelete={onDelete}
               />

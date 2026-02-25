@@ -1,35 +1,34 @@
 "use client";
 
 import { useCallback } from "react";
+import { format, addDays } from "date-fns";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
 import { useTaskPanel } from "@/hooks/useTaskPanel";
 import Header from "@/components/layout/Header";
-import TaskList from "@/components/tasks/TaskList";
 import TaskInput from "@/components/tasks/TaskInput";
 import TaskDetail from "@/components/tasks/TaskDetail";
-import SortMenu from "@/components/tasks/SortMenu";
+import DraggableTaskList from "@/components/tasks/DraggableTaskList";
 import VoiceButton from "@/components/voice/VoiceButton";
 import type { Task } from "@/types/task";
 
-export default function ImportantPage() {
+export default function DueTomorrowPage() {
   const {
-    tasks, loading, sortBy, setSortBy,
+    tasks, loading,
     createTask, updateTask, toggleComplete, toggleImportant,
     toggleMyDay, toggleInProgress, deleteTask,
-  } = useTasks({ important: true, includeCompleted: true });
-  const { lists, getDefaultList } = useTaskLists();
+  } = useTasks({ dueTomorrow: true });
+  const { getDefaultList } = useTaskLists();
   const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
 
-  const handleAddTask = useCallback(async (title: string, dueDate?: string) => {
+  const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
+  const tomorrowLabel = format(addDays(new Date(), 1), "EEEE, MMMM d");
+
+  const handleAddTask = useCallback(async (title: string) => {
     const defaultList = getDefaultList();
     if (!defaultList) return;
-    await createTask({ title, list_id: defaultList.id, is_important: true, due_date: dueDate || null });
-  }, [createTask, getDefaultList]);
-
-  const getListName = useCallback((task: Task) => {
-    return lists.find((l) => l.id === task.list_id)?.name;
-  }, [lists]);
+    await createTask({ title, list_id: defaultList.id, due_date: tomorrow });
+  }, [createTask, getDefaultList, tomorrow]);
 
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
@@ -65,28 +64,25 @@ export default function ImportantPage() {
 
   return (
     <>
-      <Header
-        title="Important"
-        actions={<SortMenu value={sortBy} onChange={setSortBy} />}
-      />
+      <Header title="Due Tomorrow" subtitle={tomorrowLabel} />
 
       <div className="space-y-4">
-        <TaskInput onAdd={handleAddTask} placeholder="Add an important task" />
+        <TaskInput onAdd={handleAddTask} placeholder="Add a task due tomorrow" />
 
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <TaskList
+          <DraggableTaskList
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onToggleImportant={toggleImportant}
             onToggleInProgress={handleToggleInProgress}
             onTaskClick={openTask}
             onDelete={deleteTask}
-            showListName={getListName}
-            emptyMessage="Tasks you mark as important show up here."
+            onReorder={updateTask}
+            emptyMessage="No tasks due tomorrow. Enjoy the calm before the storm."
           />
         )}
       </div>

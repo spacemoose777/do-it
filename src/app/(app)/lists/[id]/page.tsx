@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
+import { useTaskPanel } from "@/hooks/useTaskPanel";
 import { LIST_COLORS } from "@/lib/constants";
 import Header from "@/components/layout/Header";
 import TaskList from "@/components/tasks/TaskList";
@@ -27,12 +28,13 @@ export default function ListPage() {
 }
 
 function SingleListPage({ listId }: { listId: string }) {
-  const { tasks, loading, sortBy, setSortBy, createTask, updateTask, toggleComplete, toggleImportant, toggleMyDay, deleteTask } = useTasks({
-    listId,
-    includeCompleted: true,
-  });
+  const {
+    tasks, loading, sortBy, setSortBy,
+    createTask, updateTask, toggleComplete, toggleImportant,
+    toggleMyDay, toggleInProgress, deleteTask,
+  } = useTasks({ listId, includeCompleted: true });
   const { lists, deleteList, updateList } = useTaskLists();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const router = useRouter();
@@ -66,7 +68,17 @@ function SingleListPage({ listId }: { listId: string }) {
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
-  }, [updateTask, selectedTask]);
+  }, [updateTask, selectedTask, setSelectedTask]);
+
+  const handleToggleMyDay = useCallback(async (id: string) => {
+    const updated = await toggleMyDay(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleMyDay, selectedTask, setSelectedTask]);
+
+  const handleToggleInProgress = useCallback(async (id: string) => {
+    const updated = await toggleInProgress(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleInProgress, selectedTask, setSelectedTask]);
 
   if (selectedTask) {
     return (
@@ -76,12 +88,10 @@ function SingleListPage({ listId }: { listId: string }) {
           onUpdate={handleUpdate}
           onToggleComplete={toggleComplete}
           onToggleImportant={toggleImportant}
-          onToggleMyDay={toggleMyDay}
-          onDelete={(id) => {
-            deleteTask(id);
-            setSelectedTask(null);
-          }}
-          onClose={() => setSelectedTask(null)}
+          onToggleMyDay={handleToggleMyDay}
+          onToggleInProgress={handleToggleInProgress}
+          onDelete={(id) => { deleteTask(id); closeTask(); }}
+          onClose={closeTask}
         />
       </div>
     );
@@ -143,7 +153,8 @@ function SingleListPage({ listId }: { listId: string }) {
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onToggleImportant={toggleImportant}
-            onTaskClick={setSelectedTask}
+            onToggleInProgress={handleToggleInProgress}
+            onTaskClick={openTask}
             onDelete={deleteTask}
             emptyMessage={`No tasks in ${list.name} yet.`}
           />

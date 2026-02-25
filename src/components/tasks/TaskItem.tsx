@@ -10,6 +10,7 @@ interface TaskItemProps {
   task: Task;
   onToggleComplete: (id: string) => void;
   onToggleImportant: (id: string) => void;
+  onToggleInProgress: (id: string) => void;
   onClick: (task: Task) => void;
   onDelete?: (id: string) => void;
   showListName?: string;
@@ -26,6 +27,7 @@ export default function TaskItem({
   task,
   onToggleComplete,
   onToggleImportant,
+  onToggleInProgress,
   onClick,
   onDelete,
   showListName,
@@ -93,14 +95,37 @@ export default function TaskItem({
               <path d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
             </svg>
           )}
+          {task.is_in_progress && (
+            <svg className="w-3 h-3 text-accent" fill="currentColor" viewBox="0 0 24 24">
+              <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clipRule="evenodd" />
+            </svg>
+          )}
         </div>
       </div>
 
+      {/* In-progress toggle */}
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleImportant(task.id);
-        }}
+        onClick={(e) => { e.stopPropagation(); onToggleInProgress(task.id); }}
+        className="flex-shrink-0 p-1"
+        title={task.is_in_progress ? "Remove in-progress" : "Mark in progress"}
+      >
+        <svg
+          className={cn(
+            "w-4 h-4 transition-colors",
+            task.is_in_progress ? "text-accent" : "text-text-secondary/30 hover:text-text-secondary"
+          )}
+          fill={task.is_in_progress ? "currentColor" : "none"}
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+      </button>
+
+      {/* Important toggle */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleImportant(task.id); }}
         className="flex-shrink-0 p-1"
       >
         <svg
@@ -119,7 +144,6 @@ export default function TaskItem({
     </div>
   );
 
-  // Only use swipe on mobile (touch devices)
   if (onDelete) {
     return (
       <SwipeAction

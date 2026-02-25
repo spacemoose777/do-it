@@ -19,6 +19,7 @@ export interface Task {
   is_completed: boolean;
   completed_at: string | null;
   is_important: boolean;
+  is_in_progress: boolean;
   is_my_day: boolean;
   my_day_date: string | null;
   due_date: string | null;

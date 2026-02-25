@@ -7,6 +7,7 @@ interface TaskListProps {
   tasks: Task[];
   onToggleComplete: (id: string) => void;
   onToggleImportant: (id: string) => void;
+  onToggleInProgress: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onDelete?: (id: string) => void;
   showListName?: (task: Task) => string | undefined;
@@ -17,6 +18,7 @@ export default function TaskList({
   tasks,
   onToggleComplete,
   onToggleImportant,
+  onToggleInProgress,
   onTaskClick,
   onDelete,
   showListName,
@@ -44,6 +46,7 @@ export default function TaskList({
           task={task}
           onToggleComplete={onToggleComplete}
           onToggleImportant={onToggleImportant}
+          onToggleInProgress={onToggleInProgress}
           onClick={onTaskClick}
           onDelete={onDelete}
           showListName={showListName?.(task)}
@@ -62,6 +65,7 @@ export default function TaskList({
                 task={task}
                 onToggleComplete={onToggleComplete}
                 onToggleImportant={onToggleImportant}
+                onToggleInProgress={onToggleInProgress}
                 onClick={onTaskClick}
                 onDelete={onDelete}
                 showListName={showListName?.(task)}

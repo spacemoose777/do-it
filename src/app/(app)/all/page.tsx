@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useTasks } from "@/hooks/useTasks";
 import { useTaskLists } from "@/hooks/useTaskLists";
+import { useTaskPanel } from "@/hooks/useTaskPanel";
 import Header from "@/components/layout/Header";
 import TaskList from "@/components/tasks/TaskList";
 import TaskInput from "@/components/tasks/TaskInput";
@@ -12,11 +13,13 @@ import VoiceButton from "@/components/voice/VoiceButton";
 import type { Task } from "@/types/task";
 
 export default function AllTasksPage() {
-  const { tasks, loading, sortBy, setSortBy, createTask, updateTask, toggleComplete, toggleImportant, toggleMyDay, deleteTask } = useTasks({
-    includeCompleted: true,
-  });
+  const {
+    tasks, loading, sortBy, setSortBy,
+    createTask, updateTask, toggleComplete, toggleImportant,
+    toggleMyDay, toggleInProgress, deleteTask,
+  } = useTasks({ includeCompleted: true });
   const { lists, getDefaultList } = useTaskLists();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
 
   const handleAddTask = useCallback(async (title: string, dueDate?: string) => {
     const defaultList = getDefaultList();
@@ -31,7 +34,17 @@ export default function AllTasksPage() {
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
-  }, [updateTask, selectedTask]);
+  }, [updateTask, selectedTask, setSelectedTask]);
+
+  const handleToggleMyDay = useCallback(async (id: string) => {
+    const updated = await toggleMyDay(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleMyDay, selectedTask, setSelectedTask]);
+
+  const handleToggleInProgress = useCallback(async (id: string) => {
+    const updated = await toggleInProgress(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleInProgress, selectedTask, setSelectedTask]);
 
   if (selectedTask) {
     return (
@@ -41,12 +54,10 @@ export default function AllTasksPage() {
           onUpdate={handleUpdate}
           onToggleComplete={toggleComplete}
           onToggleImportant={toggleImportant}
-          onToggleMyDay={toggleMyDay}
-          onDelete={(id) => {
-            deleteTask(id);
-            setSelectedTask(null);
-          }}
-          onClose={() => setSelectedTask(null)}
+          onToggleMyDay={handleToggleMyDay}
+          onToggleInProgress={handleToggleInProgress}
+          onDelete={(id) => { deleteTask(id); closeTask(); }}
+          onClose={closeTask}
         />
       </div>
     );
@@ -71,7 +82,8 @@ export default function AllTasksPage() {
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onToggleImportant={toggleImportant}
-            onTaskClick={setSelectedTask}
+            onToggleInProgress={handleToggleInProgress}
+            onTaskClick={openTask}
             onDelete={deleteTask}
             showListName={getListName}
             emptyMessage="No tasks yet. Add one above to get started."

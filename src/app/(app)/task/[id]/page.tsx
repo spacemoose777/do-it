@@ -13,7 +13,7 @@ export default function TaskPage() {
   const taskId = params.id as string;
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
-  const { updateTask, toggleComplete, toggleImportant, toggleMyDay, deleteTask } = useTasks();
+  const { updateTask, toggleComplete, toggleImportant, toggleMyDay, toggleInProgress, deleteTask } = useTasks();
 
   useEffect(() => {
     async function load() {
@@ -53,10 +53,8 @@ export default function TaskPage() {
       onToggleComplete={toggleComplete}
       onToggleImportant={toggleImportant}
       onToggleMyDay={toggleMyDay}
-      onDelete={(id) => {
-        deleteTask(id);
-        router.back();
-      }}
+      onToggleInProgress={toggleInProgress}
+      onDelete={(id) => { deleteTask(id); router.back(); }}
       onClose={() => router.back()}
     />
   );
