@@ -30,6 +30,26 @@ export default function TaskPage() {
     if (updated) setTask(updated);
   }, [updateTask]);
 
+  const handleToggleComplete = useCallback(async (id: string) => {
+    const updated = await toggleComplete(id);
+    if (updated) setTask(updated);
+  }, [toggleComplete]);
+
+  const handleToggleImportant = useCallback(async (id: string) => {
+    const updated = await toggleImportant(id);
+    if (updated) setTask(updated);
+  }, [toggleImportant]);
+
+  const handleToggleMyDay = useCallback(async (id: string) => {
+    const updated = await toggleMyDay(id);
+    if (updated) setTask(updated);
+  }, [toggleMyDay]);
+
+  const handleToggleInProgress = useCallback(async (id: string) => {
+    const updated = await toggleInProgress(id);
+    if (updated) setTask(updated);
+  }, [toggleInProgress]);
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -50,10 +70,10 @@ export default function TaskPage() {
     <TaskDetail
       task={task}
       onUpdate={handleUpdate}
-      onToggleComplete={toggleComplete}
-      onToggleImportant={toggleImportant}
-      onToggleMyDay={toggleMyDay}
-      onToggleInProgress={toggleInProgress}
+      onToggleComplete={handleToggleComplete}
+      onToggleImportant={handleToggleImportant}
+      onToggleMyDay={handleToggleMyDay}
+      onToggleInProgress={handleToggleInProgress}
       onDelete={(id) => { deleteTask(id); router.back(); }}
       onClose={() => router.back()}
     />

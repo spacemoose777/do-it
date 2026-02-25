@@ -45,6 +45,16 @@ export default function MyDayPage() {
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
   }, [updateTask, selectedTask, setSelectedTask]);
 
+  const handleToggleComplete = useCallback(async (id: string) => {
+    const updated = await toggleComplete(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleComplete, selectedTask, setSelectedTask]);
+
+  const handleToggleImportant = useCallback(async (id: string) => {
+    const updated = await toggleImportant(id);
+    if (updated && selectedTask?.id === id) setSelectedTask(updated);
+  }, [toggleImportant, selectedTask, setSelectedTask]);
+
   const handleToggleMyDay = useCallback(async (id: string) => {
     const updated = await toggleMyDay(id);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
@@ -61,8 +71,8 @@ export default function MyDayPage() {
         <TaskDetail
           task={selectedTask}
           onUpdate={handleUpdate}
-          onToggleComplete={toggleComplete}
-          onToggleImportant={toggleImportant}
+          onToggleComplete={handleToggleComplete}
+          onToggleImportant={handleToggleImportant}
           onToggleMyDay={handleToggleMyDay}
           onToggleInProgress={handleToggleInProgress}
           onDelete={(id) => { deleteTask(id); closeTask(); }}
@@ -90,8 +100,8 @@ export default function MyDayPage() {
         ) : (
           <DraggableTaskList
             tasks={tasks}
-            onToggleComplete={toggleComplete}
-            onToggleImportant={toggleImportant}
+            onToggleComplete={handleToggleComplete}
+            onToggleImportant={handleToggleImportant}
             onToggleInProgress={handleToggleInProgress}
             onTaskClick={openTask}
             onDelete={deleteTask}

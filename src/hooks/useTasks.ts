@@ -253,11 +253,12 @@ export function useTasks(filter?: {
         await idb.putTask(normalizedNext);
         await enqueue("tasks", normalizedNext.id, "INSERT", normalizedNext as unknown as Record<string, unknown>);
         setTasks((prev) => applyFilter([normalizedNext, ...prev.map((t) => (t.id === id ? updated : t))]));
-        return;
+        return updated;
       }
     }
 
     setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+    return updated;
   }, [applyFilter]);
 
   const toggleImportant = useCallback(async (id: string) => {
@@ -274,6 +275,7 @@ export function useTasks(filter?: {
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
     setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+    return updated;
   }, [applyFilter]);
 
   const toggleMyDay = useCallback(async (id: string) => {
