@@ -40,18 +40,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No sender email" }, { status: 400 });
   }
 
-  // Look up Firebase user by email
+  // Look up Firebase user by email — check primary auth email first,
+  // then fall back to the allowed_senders list on the user profile document
   let userId: string;
+  const adminAuth = getAdminAuth();
+  const db = getAdminFirestore();
   try {
-    const adminAuth = getAdminAuth();
     const userRecord = await adminAuth.getUserByEmail(senderEmail);
     userId = userRecord.uid;
   } catch {
-    // User not found — silently ignore unregistered senders
-    return NextResponse.json({ ok: true, note: "sender not registered" });
+    // Primary email not found — search allowed_senders across user profiles
+    const snap = await db
+      .collection("users")
+      .where("allowed_senders", "array-contains", senderEmail)
+      .limit(1)
+      .get();
+    if (snap.empty) {
+      return NextResponse.json({ ok: true, note: "sender not registered" });
+    }
+    userId = snap.docs[0].id;
   }
-
-  const db = getAdminFirestore();
 
   // Look up user's task lists to find matching list by hashtag
   const listsSnap = await db

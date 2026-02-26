@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -21,6 +24,48 @@ export default function SettingsPage() {
   const isOnline = useOnlineStatus();
   const { fontSize, setFontSize } = useFontSize();
   const { canInstall, install } = usePWAInstall();
+
+  const [allowedSenders, setAllowedSenders] = useState<string[]>([]);
+  const [newSender, setNewSender] = useState("");
+  const [senderError, setSenderError] = useState("");
+  const [senderLoading, setSenderLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "users", user.uid)).then((snap) => {
+      if (snap.exists()) {
+        setAllowedSenders(snap.data().allowed_senders ?? []);
+      }
+    });
+  }, [user]);
+
+  async function addSender() {
+    const email = newSender.trim().toLowerCase();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setSenderError("Enter a valid email address");
+      return;
+    }
+    if (email === user?.email?.toLowerCase()) {
+      setSenderError("That's already your primary address");
+      return;
+    }
+    if (allowedSenders.includes(email)) {
+      setSenderError("Already in the list");
+      return;
+    }
+    setSenderError("");
+    setSenderLoading(true);
+    await updateDoc(doc(db, "users", user!.uid), { allowed_senders: arrayUnion(email) });
+    setAllowedSenders((prev) => [...prev, email]);
+    setNewSender("");
+    setSenderLoading(false);
+  }
+
+  async function removeSender(email: string) {
+    await updateDoc(doc(db, "users", user!.uid), { allowed_senders: arrayRemove(email) });
+    setAllowedSenders((prev) => prev.filter((e) => e !== email));
+  }
 
   const handleClearLocal = async () => {
     if (confirm("This will clear all local data. Your data will be re-synced from the server on next load. Continue?")) {
@@ -98,6 +143,54 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* Email to My Day */}
+        <section className="card p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-text-primary">Email to My Day</h2>
+          <p className="text-xs text-text-secondary">
+            Emails sent to your inbox from these addresses are added to My Day.
+            Your account email is always allowed.
+          </p>
+
+          {/* Primary (read-only) */}
+          <div className="flex items-center justify-between rounded-lg bg-bg-tertiary px-3 py-2">
+            <span className="text-sm text-text-primary">{user?.email}</span>
+            <span className="text-xs text-text-secondary">Primary</span>
+          </div>
+
+          {/* Extra senders */}
+          {allowedSenders.map((email) => (
+            <div key={email} className="flex items-center justify-between rounded-lg bg-bg-tertiary px-3 py-2">
+              <span className="text-sm text-text-primary">{email}</span>
+              <button
+                onClick={() => removeSender(email)}
+                className="text-xs text-danger hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+
+          {/* Add new */}
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={newSender}
+              onChange={(e) => { setNewSender(e.target.value); setSenderError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && addSender()}
+              placeholder="another@example.com"
+              className="input flex-1 text-sm"
+            />
+            <button
+              onClick={addSender}
+              disabled={senderLoading || !newSender.trim()}
+              className="btn-primary px-3 text-sm"
+            >
+              Add
+            </button>
+          </div>
+          {senderError && <p className="text-xs text-danger">{senderError}</p>}
         </section>
 
         {/* Sync */}
