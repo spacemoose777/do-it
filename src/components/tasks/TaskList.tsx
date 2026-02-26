@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import TaskItem from "./TaskItem";
 import type { Task } from "@/types/task";
 
@@ -24,6 +26,16 @@ export default function TaskList({
   showListName,
   emptyMessage = "No tasks yet",
 }: TaskListProps) {
+  const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
+
+  const handleToggleComplete = useCallback((id: string) => {
+    setFadingIds((prev) => new Set([...prev, id]));
+    setTimeout(() => {
+      onToggleComplete(id);
+      setFadingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }, 300);
+  }, [onToggleComplete]);
+
   const incomplete = tasks.filter((t) => !t.is_completed);
   const completed = tasks.filter((t) => t.is_completed);
 
@@ -41,16 +53,23 @@ export default function TaskList({
   return (
     <div className="space-y-1">
       {incomplete.map((task) => (
-        <TaskItem
+        <div
           key={task.id}
-          task={task}
-          onToggleComplete={onToggleComplete}
-          onToggleImportant={onToggleImportant}
-          onToggleInProgress={onToggleInProgress}
-          onClick={onTaskClick}
-          onDelete={onDelete}
-          showListName={showListName?.(task)}
-        />
+          className={cn(
+            "transition-opacity duration-300",
+            fadingIds.has(task.id) ? "opacity-0" : "opacity-100"
+          )}
+        >
+          <TaskItem
+            task={task}
+            onToggleComplete={handleToggleComplete}
+            onToggleImportant={onToggleImportant}
+            onToggleInProgress={onToggleInProgress}
+            onClick={onTaskClick}
+            onDelete={onDelete}
+            showListName={showListName?.(task)}
+          />
+        </div>
       ))}
 
       {completed.length > 0 && (

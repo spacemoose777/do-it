@@ -39,6 +39,8 @@ export default function DraggableTaskList({
   const [localOrder, setLocalOrder] = useState<Task[]>(() => sortByMyDayOrder(incomplete));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
+  const [ghostY, setGhostY] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const itemEls = useRef<Map<string, HTMLElement>>(new Map());
@@ -81,10 +83,19 @@ export default function DraggableTaskList({
       e.preventDefault();
       const y = e.touches[0].clientY;
       setDropIndex(getDropIndexAtY(y));
+      setGhostY(y);
     };
     el.addEventListener("touchmove", onMove, { passive: false });
     return () => el.removeEventListener("touchmove", onMove);
   }, [getDropIndexAtY]);
+
+  const handleToggleComplete = useCallback((id: string) => {
+    setFadingIds((prev) => new Set([...prev, id]));
+    setTimeout(() => {
+      onToggleComplete(id);
+      setFadingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }, 300);
+  }, [onToggleComplete]);
 
   const commitDrop = useCallback(
     (finalDropIndex: number | null) => {
@@ -108,6 +119,7 @@ export default function DraggableTaskList({
       draggingIdRef.current = null;
       setDraggingId(null);
       setDropIndex(null);
+      setGhostY(null);
     },
     [localOrder, onReorder]
   );
@@ -121,6 +133,7 @@ export default function DraggableTaskList({
       isDragging.current = true;
       draggingIdRef.current = taskId;
       setDraggingId(taskId);
+      setGhostY(touchStartY.current);
     }, 400);
   }, []);
 
@@ -161,6 +174,8 @@ export default function DraggableTaskList({
     );
   }
 
+  const ghostTask = draggingId ? localOrder.find((t) => t.id === draggingId) : null;
+
   return (
     <div ref={containerRef} className="space-y-1 select-none">
       {localOrder.map((task, index) => {
@@ -168,32 +183,45 @@ export default function DraggableTaskList({
         const isDropTarget = dropIndex === index && draggingId !== null && !isDraggingThis;
 
         return (
-          <div
-            key={task.id}
-            ref={(el) => {
-              if (el) itemEls.current.set(task.id, el);
-              else itemEls.current.delete(task.id);
-            }}
-            className={cn(
-              "relative transition-opacity duration-100",
-              isDraggingThis && "opacity-40",
-              isDropTarget && "border-t-2 border-accent"
+          <div key={task.id}>
+            {isDropTarget && (
+              <div className="mx-4 my-1 h-1 rounded-full bg-accent opacity-80" />
             )}
-            onTouchStart={(e) => handleRowTouchStart(task.id, e)}
-            onTouchMove={handleRowTouchMove}
-            onTouchEnd={handleRowTouchEnd}
-          >
-            <TaskItem
-              task={task}
-              onToggleComplete={onToggleComplete}
-              onToggleImportant={onToggleImportant}
-              onToggleInProgress={onToggleInProgress}
-              onClick={onTaskClick}
-              onDelete={onDelete}
-            />
+            <div
+              ref={(el) => {
+                if (el) itemEls.current.set(task.id, el);
+                else itemEls.current.delete(task.id);
+              }}
+              className={cn(
+                "relative transition-opacity duration-100",
+                isDraggingThis && "opacity-40",
+                fadingIds.has(task.id) ? "opacity-0 duration-300" : ""
+              )}
+              onTouchStart={(e) => handleRowTouchStart(task.id, e)}
+              onTouchMove={handleRowTouchMove}
+              onTouchEnd={handleRowTouchEnd}
+            >
+              <TaskItem
+                task={task}
+                onToggleComplete={handleToggleComplete}
+                onToggleImportant={onToggleImportant}
+                onToggleInProgress={onToggleInProgress}
+                onClick={onTaskClick}
+                onDelete={onDelete}
+              />
+            </div>
           </div>
         );
       })}
+
+      {ghostTask && ghostY !== null && (
+        <div
+          className="fixed left-4 right-4 z-50 pointer-events-none rounded-xl bg-bg-secondary shadow-2xl px-4 py-3 opacity-90"
+          style={{ top: ghostY - 28 }}
+        >
+          <p className="text-sm text-text-primary truncate">{ghostTask.title}</p>
+        </div>
+      )}
 
       {completed.length > 0 && (
         <details className="mt-4">
