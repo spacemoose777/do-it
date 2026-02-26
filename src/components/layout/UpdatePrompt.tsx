@@ -39,6 +39,7 @@ export default function UpdatePrompt() {
   function applyUpdate() {
     if (!waitingSW) return;
     waitingSW.postMessage("SKIP_WAITING");
+    setWaitingSW(null);
     window.location.reload();
   }
 
