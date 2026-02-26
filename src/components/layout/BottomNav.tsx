@@ -42,7 +42,7 @@ function loadNavOrder(): string[] {
     const saved = localStorage.getItem("doit-nav-order");
     if (saved) {
       const parsed: unknown = JSON.parse(saved);
-      const validSet = new Set(NAV_HREFS);
+      const validSet = new Set<string>(NAV_HREFS);
       if (
         Array.isArray(parsed) &&
         parsed.length === NAV_HREFS.length &&
