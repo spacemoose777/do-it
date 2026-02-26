@@ -38,9 +38,11 @@ export default function UpdatePrompt() {
 
   function applyUpdate() {
     if (!waitingSW) return;
-    waitingSW.postMessage("SKIP_WAITING");
     setWaitingSW(null);
-    window.location.reload();
+    waitingSW.postMessage("SKIP_WAITING");
+    // reload is handled by the controllerchange listener above, which fires
+    // only after the new SW has fully activated — avoiding a premature reload
+    // that would show the banner again on the next page load
   }
 
   if (!waitingSW) return null;
