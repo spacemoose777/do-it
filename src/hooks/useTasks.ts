@@ -86,8 +86,17 @@ export function useTasks(filter?: {
         myDayTasks.length === 0
           ? 0
           : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
-      let nextOrder = minExistingOrder - toAutoAdd.length;
-      for (const task of toAutoAdd) {
+      // Preserve the order the user arranged in "Due Tomorrow" (my_day_sort_order),
+      // falling back to sort_order for tasks that were never manually reordered.
+      const sortedToAutoAdd = [...toAutoAdd].sort((a, b) => {
+        if (a.my_day_sort_order !== null && b.my_day_sort_order !== null)
+          return a.my_day_sort_order - b.my_day_sort_order;
+        if (a.my_day_sort_order !== null) return -1;
+        if (b.my_day_sort_order !== null) return 1;
+        return a.sort_order - b.sort_order;
+      });
+      let nextOrder = minExistingOrder - sortedToAutoAdd.length;
+      for (const task of sortedToAutoAdd) {
         const updatedTask: Task = {
           ...task,
           is_my_day: true,

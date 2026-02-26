@@ -57,14 +57,6 @@ function SingleListPage({ listId }: { listId: string }) {
     setIsRenaming(false);
   }, [updateList, listId, renameValue]);
 
-  if (!list) {
-    return (
-      <div className="text-center py-16 text-text-secondary">
-        <p>List not found</p>
-      </div>
-    );
-  }
-
   const handleUpdate = useCallback(async (id: string, updates: any) => {
     const updated = await updateTask(id, updates);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
@@ -89,6 +81,14 @@ function SingleListPage({ listId }: { listId: string }) {
     const updated = await toggleInProgress(id);
     if (updated && selectedTask?.id === id) setSelectedTask(updated);
   }, [toggleInProgress, selectedTask, setSelectedTask]);
+
+  if (!list) {
+    return (
+      <div className="text-center py-16 text-text-secondary">
+        <p>List not found</p>
+      </div>
+    );
+  }
 
   if (selectedTask) {
     return (

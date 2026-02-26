@@ -2,8 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { getSubtasksByTask } from "@/lib/db/indexed-db";
 import TaskItem from "./TaskItem";
 import type { Task, TaskUpdateInput } from "@/types/task";
+
+type SubtaskCount = { total: number; completed: number };
 
 interface DraggableTaskListProps {
   tasks: Task[];
@@ -37,6 +40,7 @@ export default function DraggableTaskList({
     });
 
   const [localOrder, setLocalOrder] = useState<Task[]>(() => sortByMyDayOrder(incomplete));
+  const [subtaskCounts, setSubtaskCounts] = useState<Record<string, SubtaskCount>>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
@@ -55,6 +59,30 @@ export default function DraggableTaskList({
     if (!isDragging.current) {
       setLocalOrder(sortByMyDayOrder(incomplete));
     }
+  }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load subtask counts for all tasks
+  useEffect(() => {
+    let mounted = true;
+    async function loadCounts() {
+      const counts: Record<string, SubtaskCount> = {};
+      await Promise.all(
+        tasks.map(async (t) => {
+          try {
+            const subs = await getSubtasksByTask(t.id);
+            if (subs.length > 0) {
+              counts[t.id] = {
+                total: subs.length,
+                completed: subs.filter((s) => s.is_completed).length,
+              };
+            }
+          } catch {}
+        })
+      );
+      if (mounted) setSubtaskCounts(counts);
+    }
+    loadCounts();
+    return () => { mounted = false; };
   }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getDropIndexAtY = useCallback(
@@ -208,6 +236,8 @@ export default function DraggableTaskList({
                 onToggleInProgress={onToggleInProgress}
                 onClick={onTaskClick}
                 onDelete={onDelete}
+                subtaskTotal={subtaskCounts[task.id]?.total}
+                subtaskCompleted={subtaskCounts[task.id]?.completed}
               />
             </div>
           </div>
@@ -238,6 +268,8 @@ export default function DraggableTaskList({
                 onToggleInProgress={onToggleInProgress}
                 onClick={onTaskClick}
                 onDelete={onDelete}
+                subtaskTotal={subtaskCounts[task.id]?.total}
+                subtaskCompleted={subtaskCounts[task.id]?.completed}
               />
             ))}
           </div>

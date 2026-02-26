@@ -10,10 +10,21 @@ interface RecurrencePickerProps {
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+type CustomUnit = "days" | "weeks" | "months" | "years";
+
+function unitFromRule(rule: RecurrenceRule | null): CustomUnit {
+  if (!rule) return "days";
+  if (rule.type === "weekly") return "weeks";
+  if (rule.type === "monthly") return "months";
+  if (rule.type === "yearly") return "years";
+  return "days";
+}
 
 export default function RecurrencePicker({ value, onChange }: RecurrencePickerProps) {
-  const [showCustom, setShowCustom] = useState(false);
+  const isCustom = !!value && (value.type === "custom" || (value.interval ?? 1) > 1);
+  const [showCustom, setShowCustom] = useState(isCustom);
   const [customInterval, setCustomInterval] = useState(String(value?.interval || 1));
+  const [customUnit, setCustomUnit] = useState<CustomUnit>(unitFromRule(value));
   const [customDays, setCustomDays] = useState<number[]>(value?.daysOfWeek || []);
 
   const handlePreset = (type: string) => {
@@ -29,10 +40,18 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
   };
 
   const handleCustomSave = () => {
+    const interval = Math.max(1, parseInt(customInterval) || 1);
+    let type: RecurrenceRule["type"];
+    switch (customUnit) {
+      case "weeks":  type = "weekly";  break;
+      case "months": type = "monthly"; break;
+      case "years":  type = "yearly";  break;
+      default:       type = "custom";  break;
+    }
     onChange({
-      type: "custom",
-      interval: Math.max(1, parseInt(customInterval) || 1),
-      daysOfWeek: customDays.length > 0 ? customDays : undefined,
+      type,
+      interval,
+      ...(customUnit === "weeks" && customDays.length > 0 ? { daysOfWeek: customDays } : {}),
     });
     setShowCustom(false);
   };
@@ -43,6 +62,10 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
     );
   };
 
+  // A preset is "active" only when it matches the type AND interval is 1 (preset default)
+  const isPresetActive = (presetValue: string) =>
+    value?.type === presetValue && (value?.interval ?? 1) === 1;
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -51,7 +74,7 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
             key={preset.value}
             onClick={() => handlePreset(preset.value)}
             className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-              value?.type === preset.value
+              preset.value !== "custom" && isPresetActive(preset.value)
                 ? "bg-accent text-white"
                 : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
             }`}
@@ -76,7 +99,7 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
             <input
               type="number"
               min={1}
-              max={365}
+              max={999}
               value={customInterval}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -84,27 +107,41 @@ export default function RecurrencePicker({ value, onChange }: RecurrencePickerPr
               }}
               className="w-16 input-field text-center text-sm"
             />
-            <span className="text-sm text-text-secondary">days</span>
+            <select
+              value={customUnit}
+              onChange={(e) => {
+                setCustomUnit(e.target.value as CustomUnit);
+                setCustomDays([]);
+              }}
+              className="input-field text-sm"
+            >
+              <option value="days">days</option>
+              <option value="weeks">weeks</option>
+              <option value="months">months</option>
+              <option value="years">years</option>
+            </select>
           </div>
 
-          <div>
-            <p className="text-xs text-text-secondary mb-2">On specific days (optional):</p>
-            <div className="flex gap-1">
-              {DAY_NAMES.map((name, i) => (
-                <button
-                  key={i}
-                  onClick={() => toggleDay(i)}
-                  className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
-                    customDays.includes(i)
-                      ? "bg-accent text-white"
-                      : "bg-bg-secondary text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
+          {customUnit === "weeks" && (
+            <div>
+              <p className="text-xs text-text-secondary mb-2">On specific days (optional):</p>
+              <div className="flex gap-1">
+                {DAY_NAMES.map((name, i) => (
+                  <button
+                    key={i}
+                    onClick={() => toggleDay(i)}
+                    className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
+                      customDays.includes(i)
+                        ? "bg-accent text-white"
+                        : "bg-bg-secondary text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <button onClick={handleCustomSave} className="btn-primary text-sm w-full">
             Save Custom Recurrence

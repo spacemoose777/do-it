@@ -57,8 +57,12 @@ export default function DatePicker({ value, onChange, label }: DatePickerProps) 
       {showCustom && (
         <input
           type="date"
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value || null)}
+          value={value || format(new Date(), "yyyy-MM-dd")}
+          min={format(new Date(), "yyyy-MM-dd")}
+          max="2099-12-31"
+          onChange={(e) => {
+            if (e.target.value) onChange(e.target.value);
+          }}
           className="input-field"
         />
       )}

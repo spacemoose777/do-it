@@ -14,6 +14,8 @@ interface TaskItemProps {
   onClick: (task: Task) => void;
   onDelete?: (id: string) => void;
   showListName?: string;
+  subtaskTotal?: number;
+  subtaskCompleted?: number;
 }
 
 function priorityBadgeClass(p: number): string {
@@ -31,6 +33,8 @@ export default function TaskItem({
   onClick,
   onDelete,
   showListName,
+  subtaskTotal,
+  subtaskCompleted,
 }: TaskItemProps) {
   const reminders = task.reminders ?? (task.reminder_at ? [task.reminder_at] : []);
 
@@ -75,6 +79,11 @@ export default function TaskItem({
               )}
             >
               {formatDueDate(task.due_date)}
+            </span>
+          )}
+          {(subtaskTotal ?? 0) > 0 && (
+            <span className="text-xs text-text-secondary">
+              {subtaskCompleted} of {subtaskTotal}
             </span>
           )}
           {task.recurrence_rule && (
