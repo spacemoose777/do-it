@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 
@@ -33,26 +34,161 @@ const navIcons: Record<string, (active: boolean) => JSX.Element> = {
   ),
 };
 
+const NAV_HREFS = NAV_ITEMS.map((i) => i.href);
+
+function loadNavOrder(): string[] {
+  if (typeof window === "undefined") return [...NAV_HREFS];
+  try {
+    const saved = localStorage.getItem("doit-nav-order");
+    if (saved) {
+      const parsed: unknown = JSON.parse(saved);
+      const validSet = new Set(NAV_HREFS);
+      if (
+        Array.isArray(parsed) &&
+        parsed.length === NAV_HREFS.length &&
+        parsed.every((h): h is string => typeof h === "string" && validSet.has(h))
+      ) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [...NAV_HREFS];
+}
+
 export default function BottomNav() {
   const pathname = usePathname();
+  const [navOrder, setNavOrder] = useState<string[]>(loadNavOrder);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragTo, setDragTo] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  const pointerStartPos = useRef({ x: 0, y: 0 });
+
+  const isDragging = dragFrom !== null;
+
+  const orderedItems = navOrder.map((href) => NAV_ITEMS.find((i) => i.href === href)!);
+
+  const previewItems = (() => {
+    if (!isDragging || dragTo === null) return orderedItems;
+    const arr = [...orderedItems];
+    const [item] = arr.splice(dragFrom, 1);
+    arr.splice(dragTo, 0, item);
+    return arr;
+  })();
+
+  const draggedItemHref = isDragging ? orderedItems[dragFrom]?.href : null;
+
+  const getSlotIndex = useCallback(
+    (clientX: number): number => {
+      if (!containerRef.current) return 0;
+      const children = Array.from(containerRef.current.children).slice(
+        0,
+        orderedItems.length
+      ) as HTMLElement[];
+      for (let i = 0; i < children.length; i++) {
+        const rect = children[i].getBoundingClientRect();
+        if (clientX < rect.left + rect.width / 2) return i;
+      }
+      return orderedItems.length - 1;
+    },
+    [orderedItems.length]
+  );
+
+  const handleItemPointerDown = useCallback(
+    (e: React.PointerEvent, index: number) => {
+      if (isDragging) return;
+      pointerStartPos.current = { x: e.clientX, y: e.clientY };
+      const el = e.currentTarget as HTMLElement;
+      const pointerId = e.pointerId;
+      longPressTimer.current = setTimeout(() => {
+        try {
+          el.setPointerCapture(pointerId);
+        } catch {
+          return;
+        }
+        setDragFrom(index);
+        setDragTo(index);
+        navigator.vibrate?.(50);
+      }, 500);
+    },
+    [isDragging]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging) {
+        const dx = Math.abs(e.clientX - pointerStartPos.current.x);
+        const dy = Math.abs(e.clientY - pointerStartPos.current.y);
+        if (dx > 8 || dy > 8) {
+          clearTimeout(longPressTimer.current);
+        }
+        return;
+      }
+      const slot = getSlotIndex(e.clientX);
+      setDragTo(slot);
+    },
+    [isDragging, getSlotIndex]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    clearTimeout(longPressTimer.current);
+    if (isDragging && dragFrom !== null && dragTo !== null && dragFrom !== dragTo) {
+      const newOrder = [...navOrder];
+      const [item] = newOrder.splice(dragFrom, 1);
+      newOrder.splice(dragTo, 0, item);
+      setNavOrder(newOrder);
+      localStorage.setItem("doit-nav-order", JSON.stringify(newOrder));
+    }
+    setDragFrom(null);
+    setDragTo(null);
+  }, [isDragging, dragFrom, dragTo, navOrder]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-secondary border-t border-border z-40">
-      <div className="flex items-center justify-around h-16 px-2">
-        {NAV_ITEMS.map((item) => {
+      <div
+        ref={containerRef}
+        className="flex items-center justify-around h-16 px-2"
+        style={{ touchAction: "none" }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {previewItems.map((item) => {
           const isActive = pathname === item.href;
+          const isDraggedItem = item.href === draggedItemHref;
+          const originalIndex = orderedItems.findIndex((i) => i.href === item.href);
           return (
-            <Link
+            <div
               key={item.href}
-              href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-xl transition-colors",
-                isActive ? "text-accent" : "text-text-secondary"
+                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-xl select-none transition-transform duration-150",
+                isDraggedItem && isDragging && "scale-110 opacity-60"
               )}
+              onPointerDown={(e) => handleItemPointerDown(e, originalIndex)}
             >
-              {navIcons[item.icon](isActive)}
-              <span className="text-[10px] font-medium">{item.label}</span>
-            </Link>
+              {isDragging ? (
+                <div
+                  className={cn(
+                    "flex flex-col items-center gap-1",
+                    isActive ? "text-accent" : "text-text-secondary"
+                  )}
+                >
+                  {navIcons[item.icon](isActive)}
+                  <span className="text-[10px] font-medium">{item.label}</span>
+                </div>
+              ) : (
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex flex-1 flex-col items-center gap-1",
+                    isActive ? "text-accent" : "text-text-secondary"
+                  )}
+                >
+                  {navIcons[item.icon](isActive)}
+                  <span className="text-[10px] font-medium">{item.label}</span>
+                </Link>
+              )}
+            </div>
           );
         })}
         <Link
