@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, setDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSync } from "@/contexts/SyncContext";
@@ -56,14 +56,14 @@ export default function SettingsPage() {
     }
     setSenderError("");
     setSenderLoading(true);
-    await updateDoc(doc(db, "users", user!.uid), { allowed_senders: arrayUnion(email) });
+    await setDoc(doc(db, "users", user!.uid), { allowed_senders: arrayUnion(email) }, { merge: true });
     setAllowedSenders((prev) => [...prev, email]);
     setNewSender("");
     setSenderLoading(false);
   }
 
   async function removeSender(email: string) {
-    await updateDoc(doc(db, "users", user!.uid), { allowed_senders: arrayRemove(email) });
+    await setDoc(doc(db, "users", user!.uid), { allowed_senders: arrayRemove(email) }, { merge: true });
     setAllowedSenders((prev) => prev.filter((e) => e !== email));
   }
 
