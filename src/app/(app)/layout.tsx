@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { SyncProvider } from "@/contexts/SyncContext";
+import { startReminderChecker, stopReminderChecker } from "@/lib/notifications/reminder-scheduler";
 import Sidebar from "@/components/layout/Sidebar";
 import BottomNav from "@/components/layout/BottomNav";
 import OfflineIndicator from "@/components/layout/OfflineIndicator";
@@ -18,6 +19,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (user) {
+      startReminderChecker(user.uid);
+      return () => stopReminderChecker();
+    }
+  }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (

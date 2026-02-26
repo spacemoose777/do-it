@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { getSubtasksByTask } from "@/lib/db/indexed-db";
 import TaskItem from "./TaskItem";
 import type { Task } from "@/types/task";
+
+type SubtaskCount = { total: number; completed: number };
 
 interface TaskListProps {
   tasks: Task[];
@@ -27,6 +30,30 @@ export default function TaskList({
   emptyMessage = "No tasks yet",
 }: TaskListProps) {
   const [fadingIds, setFadingIds] = useState<Set<string>>(new Set());
+  const [subtaskCounts, setSubtaskCounts] = useState<Record<string, SubtaskCount>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadCounts() {
+      const counts: Record<string, SubtaskCount> = {};
+      await Promise.all(
+        tasks.map(async (t) => {
+          try {
+            const subs = await getSubtasksByTask(t.id);
+            if (subs.length > 0) {
+              counts[t.id] = {
+                total: subs.length,
+                completed: subs.filter((s) => s.is_completed).length,
+              };
+            }
+          } catch {}
+        })
+      );
+      if (mounted) setSubtaskCounts(counts);
+    }
+    loadCounts();
+    return () => { mounted = false; };
+  }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleComplete = useCallback((id: string) => {
     setFadingIds((prev) => new Set([...prev, id]));
@@ -68,6 +95,8 @@ export default function TaskList({
             onClick={onTaskClick}
             onDelete={onDelete}
             showListName={showListName?.(task)}
+            subtaskTotal={subtaskCounts[task.id]?.total}
+            subtaskCompleted={subtaskCounts[task.id]?.completed}
           />
         </div>
       ))}
@@ -88,6 +117,8 @@ export default function TaskList({
                 onClick={onTaskClick}
                 onDelete={onDelete}
                 showListName={showListName?.(task)}
+                subtaskTotal={subtaskCounts[task.id]?.total}
+                subtaskCompleted={subtaskCounts[task.id]?.completed}
               />
             ))}
           </div>
