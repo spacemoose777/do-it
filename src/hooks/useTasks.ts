@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSync } from "@/contexts/SyncContext";
 import * as idb from "@/lib/db/indexed-db";
 import { enqueue } from "@/lib/sync/sync-queue";
 import { nowISOString, todayDateString, tomorrowDateString } from "@/lib/date-utils";
@@ -32,6 +33,7 @@ export function useTasks(filter?: {
   includeCompleted?: boolean;
 }) {
   const { user } = useAuth();
+  const { lastSyncedAt } = useSync();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
@@ -127,7 +129,7 @@ export function useTasks(filter?: {
 
   useEffect(() => {
     loadTasks();
-  }, [loadTasks]);
+  }, [loadTasks, lastSyncedAt]);
 
   const sortedTasks = useCallback(() => {
     const sorted = [...tasks];

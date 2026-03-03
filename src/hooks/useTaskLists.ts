@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSync } from "@/contexts/SyncContext";
 import * as idb from "@/lib/db/indexed-db";
 import { enqueue } from "@/lib/sync/sync-queue";
 import { nowISOString } from "@/lib/date-utils";
@@ -10,6 +11,7 @@ import type { TaskList, TaskListCreateInput } from "@/types/task";
 
 export function useTaskLists() {
   const { user } = useAuth();
+  const { lastSyncedAt } = useSync();
   const [lists, setLists] = useState<TaskList[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +24,7 @@ export function useTaskLists() {
 
   useEffect(() => {
     loadLists();
-  }, [loadLists]);
+  }, [loadLists, lastSyncedAt]);
 
   const createList = useCallback(async (input: Partial<TaskListCreateInput>) => {
     if (!user) return null;
