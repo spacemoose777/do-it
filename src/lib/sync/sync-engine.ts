@@ -10,7 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import * as idb from "@/lib/db/indexed-db";
-import { peekAll, dequeue } from "./sync-queue";
+import { peekAll, dequeue, pendingCount } from "./sync-queue";
 import type { SyncQueueItem } from "@/types/sync";
 import type { Task, Subtask, TaskList } from "@/types/task";
 
@@ -119,8 +119,10 @@ export async function pullChanges(userId: string): Promise<void> {
   }
 
   // Detect server-side deletes:
-  // Compare local IDB records against server - if a record exists locally but not on server, delete it
-  if (lastSyncDate) {
+  // Compare local IDB records against server - if a record exists locally but not on server, delete it.
+  // Skip if there are pending pushes — those local records may not have reached the server yet.
+  const pending = await pendingCount();
+  if (lastSyncDate && pending === 0) {
     const serverTaskIds = new Set(tasksSnap.docs.map((d) => d.id));
     const localTasks = await idb.getAllTasks(userId);
     for (const local of localTasks) {

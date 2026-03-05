@@ -24,6 +24,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     error: null,
   });
   const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isSyncingRef = useRef(false);
 
   const updatePendingCount = useCallback(async () => {
     const count = await pendingCount();
@@ -31,8 +32,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const triggerSync = useCallback(async () => {
-    if (!user || !isOnline || state.isSyncing) return;
+    if (!user || !isOnline || isSyncingRef.current) return;
 
+    isSyncingRef.current = true;
     setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
     try {
@@ -45,6 +47,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       }
 
       const count = await pendingCount();
+      isSyncingRef.current = false;
       setState({
         isSyncing: false,
         lastSyncedAt: new Date().toISOString(),
@@ -52,13 +55,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         error: null,
       });
     } catch (err) {
+      isSyncingRef.current = false;
       setState((prev) => ({
         ...prev,
         isSyncing: false,
         error: err instanceof Error ? err.message : "Sync failed",
       }));
     }
-  }, [user, isOnline, state.isSyncing]);
+  }, [user, isOnline]);
 
   // Initial sync on login
   useEffect(() => {

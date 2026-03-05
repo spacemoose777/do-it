@@ -258,7 +258,20 @@ export function useTasks(filter?: {
 
     // Handle recurrence
     if (isCompleting && normalizedExisting.recurrence_rule) {
-      const nextTask = createNextRecurringTask(normalizedExisting);
+      // Guard: skip if a future incomplete occurrence already exists (e.g. from another tab/device)
+      const allTasks = await idb.getAllTasks(normalizedExisting.user_id);
+      const ruleKey = JSON.stringify(normalizedExisting.recurrence_rule);
+      const alreadyExists = allTasks.some(
+        (t) =>
+          !t.is_completed &&
+          t.id !== id &&
+          t.title === normalizedExisting.title &&
+          t.list_id === normalizedExisting.list_id &&
+          JSON.stringify(t.recurrence_rule) === ruleKey &&
+          t.due_date !== null &&
+          t.due_date > (normalizedExisting.due_date ?? "")
+      );
+      const nextTask = alreadyExists ? null : createNextRecurringTask(normalizedExisting);
       if (nextTask) {
         const normalizedNext = normalizeTask(nextTask as Task);
         await idb.putTask(normalizedNext);
