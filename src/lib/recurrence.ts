@@ -14,10 +14,11 @@ export function createNextRecurringTask(completedTask: Task): Task | null {
 
   if (!nextDueDate) return null;
 
-  // If the next occurrence is in the past (task was overdue), jump to tomorrow
-  // instead of backfilling every missed day one at a time
+  // If the next occurrence is today or in the past (task was overdue), jump to
+  // tomorrow instead of backfilling every missed day one at a time.
+  // Uses <= so a 1-day-overdue daily task doesn't respawn due today again.
   const today = todayDateString();
-  if (nextDueDate < today) {
+  if (nextDueDate <= today) {
     nextDueDate = tomorrowDateString();
   }
 

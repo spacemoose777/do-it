@@ -62,7 +62,7 @@ async function pushSingleItem(userId: string, item: SyncQueueItem): Promise<void
       // Firestore uses setDoc with merge for both insert and update
       // Remove the user_id field since it's encoded in the path
       const { user_id, ...docData } = data as Record<string, unknown>;
-      await setDoc(docRef, docData, { merge: true });
+      await setDoc(docRef, docData);
       break;
     }
     case "DELETE": {
@@ -73,82 +73,76 @@ async function pushSingleItem(userId: string, item: SyncQueueItem): Promise<void
 }
 
 export async function pullChanges(userId: string): Promise<void> {
-  const lastSync = await idb.getMeta("last_sync");
-  const lastSyncDate = lastSync ? new Date(lastSync) : null;
+  // Fetch everything from Firestore up front
+  const [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
+    getDocs(taskListsCol(userId)),
+    getDocs(tasksCol(userId)),
+    getDocs(subtasksCol(userId)),
+  ]);
 
-  // Pull task lists
-  const listsSnap = await getDocs(taskListsCol(userId));
-  const lists: TaskList[] = [];
+  // Build local lookup maps so we can do conflict resolution in O(1)
+  const [localTasksArr, localListsArr] = await Promise.all([
+    idb.getAllTasks(userId),
+    idb.getAllTaskLists(userId),
+  ]);
+  const localTaskMap = new Map(localTasksArr.map((t) => [t.id, t]));
+  const localListMap = new Map(localListsArr.map((l) => [l.id, l]));
+
+  // ── Task lists: server wins on tie (server is source of truth) ──────────────
+  const listsToWrite: TaskList[] = [];
   listsSnap.forEach((docSnap) => {
-    const data = docSnap.data();
-    const list = { ...data, id: docSnap.id, user_id: userId } as TaskList;
-    if (!lastSyncDate || new Date(list.updated_at) > lastSyncDate) {
-      lists.push(list);
+    const server = { ...docSnap.data(), id: docSnap.id, user_id: userId } as TaskList;
+    const local = localListMap.get(server.id);
+    if (!local || new Date(server.updated_at) >= new Date(local.updated_at)) {
+      listsToWrite.push(server);
     }
   });
-  if (lists.length > 0) {
-    await idb.putManyTaskLists(lists);
-  }
+  if (listsToWrite.length > 0) await idb.putManyTaskLists(listsToWrite);
 
-  // Pull tasks
-  const tasksSnap = await getDocs(tasksCol(userId));
-  const tasks: Task[] = [];
+  // ── Tasks: conflict resolution — keep whichever side is newer ───────────────
+  // NOTE: the old code filtered by `updated_at > lastSyncDate`, which caused
+  // tasks created offline and pushed late to be permanently missed by other
+  // devices that had already synced past that timestamp. We now compare against
+  // the local record directly instead of against a wall-clock cutoff.
+  const tasksToWrite: Task[] = [];
   tasksSnap.forEach((docSnap) => {
-    const data = docSnap.data();
-    const task = { ...data, id: docSnap.id, user_id: userId } as Task;
-    if (!lastSyncDate || new Date(task.updated_at) > lastSyncDate) {
-      tasks.push(task);
+    const server = { ...docSnap.data(), id: docSnap.id, user_id: userId } as Task;
+    const local = localTaskMap.get(server.id);
+    if (!local || new Date(server.updated_at) >= new Date(local.updated_at)) {
+      tasksToWrite.push(server);
     }
   });
-  if (tasks.length > 0) {
-    await idb.putManyTasks(tasks);
-  }
+  if (tasksToWrite.length > 0) await idb.putManyTasks(tasksToWrite);
 
-  // Pull subtasks
-  const subtasksSnap = await getDocs(subtasksCol(userId));
-  const subtasks: Subtask[] = [];
-  subtasksSnap.forEach((docSnap) => {
-    const data = docSnap.data();
-    const subtask = { ...data, id: docSnap.id, user_id: userId } as Subtask;
-    if (!lastSyncDate || new Date(subtask.updated_at) > lastSyncDate) {
-      subtasks.push(subtask);
-    }
-  });
-  if (subtasks.length > 0) {
-    await idb.putManySubtasks(subtasks);
-  }
+  // ── Subtasks: always accept server (subtask conflicts are rare) ──────────────
+  const subtasks: Subtask[] = subtasksSnap.docs.map(
+    (d) => ({ ...d.data(), id: d.id, user_id: userId } as Subtask)
+  );
+  if (subtasks.length > 0) await idb.putManySubtasks(subtasks);
 
-  // Detect server-side deletes:
-  // Compare local IDB records against server - if a record exists locally but not on server, delete it.
-  // Skip if there are pending pushes — those local records may not have reached the server yet.
+  // ── Server-side delete detection ─────────────────────────────────────────────
+  // Skip if there are pending pushes — local records may not have reached the
+  // server yet and would be incorrectly deleted.
   const pending = await pendingCount();
-  if (lastSyncDate && pending === 0) {
+  if (pending === 0) {
     const serverTaskIds = new Set(tasksSnap.docs.map((d) => d.id));
-    const localTasks = await idb.getAllTasks(userId);
-    for (const local of localTasks) {
-      if (!serverTaskIds.has(local.id)) {
-        await idb.deleteTask(local.id);
-      }
+    for (const local of localTasksArr) {
+      if (!serverTaskIds.has(local.id)) await idb.deleteTask(local.id);
     }
 
     const serverSubtaskIds = new Set(subtasksSnap.docs.map((d) => d.id));
     const localSubtasks = await Promise.all(
-      localTasks.map((t) => idb.getSubtasksByTask(t.id))
+      localTasksArr.map((t) => idb.getSubtasksByTask(t.id))
     );
     for (const group of localSubtasks) {
       for (const local of group) {
-        if (!serverSubtaskIds.has(local.id)) {
-          await idb.deleteSubtask(local.id);
-        }
+        if (!serverSubtaskIds.has(local.id)) await idb.deleteSubtask(local.id);
       }
     }
 
     const serverListIds = new Set(listsSnap.docs.map((d) => d.id));
-    const localLists = await idb.getAllTaskLists(userId);
-    for (const local of localLists) {
-      if (!serverListIds.has(local.id)) {
-        await idb.deleteTaskList(local.id);
-      }
+    for (const local of localListsArr) {
+      if (!serverListIds.has(local.id)) await idb.deleteTaskList(local.id);
     }
   }
 
