@@ -77,10 +77,10 @@ export function useTasks(filter?: {
     }
     data = cleaned;
 
-    // Auto-add tasks due today to My Day (placed at the top)
+    // Auto-add tasks due today or overdue to My Day (placed at the top)
     const today = todayDateString();
     const toAutoAdd = data.filter(
-      (t) => t.due_date === today && !t.is_my_day && !t.is_completed
+      (t) => t.due_date !== null && t.due_date <= today && !t.is_my_day && !t.is_completed
     );
     if (toAutoAdd.length > 0) {
       const myDayTasks = data.filter((t) => t.is_my_day);

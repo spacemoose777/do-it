@@ -69,6 +69,11 @@ export default function TaskItem({
           {showListName && (
             <span className="text-xs text-text-secondary">{showListName}</span>
           )}
+          {task.due_date && isDueDateOverdue(task.due_date) && !task.is_completed && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-danger/15 text-danger leading-none">
+              Overdue
+            </span>
+          )}
           {task.due_date && (
             <span
               className={cn(
