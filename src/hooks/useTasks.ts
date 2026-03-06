@@ -354,6 +354,20 @@ export function useTasks(filter?: {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const batchReorderMyDay = useCallback(async (updates: Array<{ id: string; my_day_sort_order: number }>) => {
+    const now = nowISOString();
+    const updatedMap = new Map<string, Task>();
+    for (const { id, my_day_sort_order } of updates) {
+      const existing = await idb.getTask(id);
+      if (!existing) continue;
+      const updated: Task = { ...normalizeTask(existing), my_day_sort_order, updated_at: now };
+      await idb.putTask(updated);
+      await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
+      updatedMap.set(id, updated);
+    }
+    setTasks((prev) => prev.map((t) => updatedMap.get(t.id) ?? t));
+  }, []);
+
   return {
     tasks: sortedTasks(),
     loading,
@@ -366,6 +380,7 @@ export function useTasks(filter?: {
     toggleMyDay,
     toggleInProgress,
     deleteTask,
+    batchReorderMyDay,
     refresh: loadTasks,
   };
 }

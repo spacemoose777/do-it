@@ -16,6 +16,7 @@ interface DraggableTaskListProps {
   onTaskClick: (task: Task) => void;
   onDelete: (id: string) => void;
   onReorder: (id: string, updates: TaskUpdateInput) => void;
+  onBatchReorder?: (updates: Array<{ id: string; my_day_sort_order: number }>) => void;
   emptyMessage?: string;
 }
 
@@ -27,6 +28,7 @@ export default function DraggableTaskList({
   onTaskClick,
   onDelete,
   onReorder,
+  onBatchReorder,
   emptyMessage = "No tasks yet",
 }: DraggableTaskListProps) {
   const incomplete = tasks.filter((t) => !t.is_completed);
@@ -61,7 +63,8 @@ export default function DraggableTaskList({
     }
   }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load subtask counts for all tasks
+  // Load subtask counts — only when the set of task IDs actually changes
+  const taskIdsKey = tasks.map((t) => t.id).join(",");
   useEffect(() => {
     let mounted = true;
     async function loadCounts() {
@@ -83,7 +86,7 @@ export default function DraggableTaskList({
     }
     loadCounts();
     return () => { mounted = false; };
-  }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [taskIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getDropIndexAtY = useCallback(
     (clientY: number): number => {
@@ -102,7 +105,11 @@ export default function DraggableTaskList({
     [localOrder]
   );
 
-  // Non-passive touchmove to prevent page scroll during drag
+  // Keep a stable ref so the touchmove listener (attached once) always has the latest fn
+  const getDropIndexAtYRef = useRef(getDropIndexAtY);
+  useEffect(() => { getDropIndexAtYRef.current = getDropIndexAtY; }, [getDropIndexAtY]);
+
+  // Non-passive touchmove to prevent page scroll during drag — attached once
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -110,12 +117,12 @@ export default function DraggableTaskList({
       if (!isDragging.current) return;
       e.preventDefault();
       const y = e.touches[0].clientY;
-      setDropIndex(getDropIndexAtY(y));
+      setDropIndex(getDropIndexAtYRef.current(y));
       setGhostY(y);
     };
     el.addEventListener("touchmove", onMove, { passive: false });
     return () => el.removeEventListener("touchmove", onMove);
-  }, [getDropIndexAtY]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleComplete = useCallback((id: string) => {
     setFadingIds((prev) => new Set([...prev, id]));
@@ -137,9 +144,13 @@ export default function DraggableTaskList({
           const [moved] = newOrder.splice(fromIndex, 1);
           newOrder.splice(finalDropIndex, 0, moved);
           setLocalOrder(newOrder);
-          newOrder.forEach((task, idx) => {
-            onReorder(task.id, { my_day_sort_order: idx });
-          });
+          if (onBatchReorder) {
+            onBatchReorder(newOrder.map((task, idx) => ({ id: task.id, my_day_sort_order: idx })));
+          } else {
+            newOrder.forEach((task, idx) => {
+              onReorder(task.id, { my_day_sort_order: idx });
+            });
+          }
         }
       }
 

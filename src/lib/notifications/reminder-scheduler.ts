@@ -6,12 +6,12 @@ import { showLocalNotification } from "./push-manager";
 let checkInterval: NodeJS.Timeout | null = null;
 
 export function startReminderChecker(userId: string): void {
-  // Check every 30 seconds for due reminders
+  // Check every 60 seconds for due reminders
   if (checkInterval) clearInterval(checkInterval);
 
   checkInterval = setInterval(() => {
     checkReminders(userId);
-  }, 30000);
+  }, 60000);
 
   // Also check immediately
   checkReminders(userId);

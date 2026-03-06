@@ -27,16 +27,16 @@ export default function SwipeAction({
   const ref = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const currentX = useRef(0);
+  const swipingRef = useRef(false);
   const [offset, setOffset] = useState(0);
-  const [swiping, setSwiping] = useState(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
-    setSwiping(true);
+    swipingRef.current = true;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!swiping) return;
+    if (!swipingRef.current) return;
     currentX.current = e.touches[0].clientX;
     const diff = currentX.current - startX.current;
 
@@ -51,7 +51,7 @@ export default function SwipeAction({
   };
 
   const handleTouchEnd = () => {
-    setSwiping(false);
+    swipingRef.current = false;
     if (offset > SWIPE_THRESHOLD && onSwipeRight) {
       onSwipeRight();
     } else if (offset < -SWIPE_THRESHOLD && onSwipeLeft) {
@@ -77,7 +77,7 @@ export default function SwipeAction({
         className="relative bg-bg-secondary transition-transform"
         style={{
           transform: `translateX(${offset}px)`,
-          transition: swiping ? "none" : "transform 0.3s ease-out",
+          transition: offset !== 0 ? "none" : "transform 0.3s ease-out",
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

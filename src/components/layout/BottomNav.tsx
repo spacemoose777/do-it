@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 
@@ -65,6 +65,10 @@ export default function BottomNav() {
   const pointerStartPos = useRef({ x: 0, y: 0 });
 
   const isDragging = dragFrom !== null;
+
+  useEffect(() => {
+    return () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
+  }, []);
 
   const orderedItems = navOrder.map((href) => NAV_ITEMS.find((i) => i.href === href)!);
 
@@ -148,7 +152,7 @@ export default function BottomNav() {
       <div
         ref={containerRef}
         className="flex items-center justify-around h-16 px-2"
-        style={{ touchAction: "none" }}
+        style={{ touchAction: isDragging ? "none" : "auto" }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}

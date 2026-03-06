@@ -17,7 +17,7 @@ export default function MyDayPage() {
   const {
     tasks, loading, sortBy, setSortBy,
     createTask, updateTask, toggleComplete, toggleImportant,
-    toggleMyDay, toggleInProgress, deleteTask,
+    toggleMyDay, toggleInProgress, deleteTask, batchReorderMyDay,
   } = useTasks({ myDay: true });
   const { lists, getDefaultList } = useTaskLists();
   const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
@@ -106,6 +106,7 @@ export default function MyDayPage() {
             onTaskClick={openTask}
             onDelete={deleteTask}
             onReorder={updateTask}
+            onBatchReorder={batchReorderMyDay}
             emptyMessage="Focus on what matters today. Add tasks to get started."
           />
         )}
