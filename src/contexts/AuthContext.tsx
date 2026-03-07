@@ -11,6 +11,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import { registerFCMToken, unregisterFCMToken } from "@/lib/notifications/fcm-token";
 
 interface AuthContextType {
   user: User | null;
@@ -31,6 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      if (user) {
+        // Fire-and-forget — register this device for push notifications
+        registerFCMToken(user.uid).catch(console.warn);
+      }
     });
 
     return () => unsubscribe();
@@ -56,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (auth.currentUser) {
+      await unregisterFCMToken(auth.currentUser.uid).catch(() => {});
+    }
     await firebaseSignOut(auth);
   };
 

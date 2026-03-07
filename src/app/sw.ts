@@ -55,7 +55,7 @@ self.addEventListener("push", (event) => {
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         tag: data.tag || "reminder",
-        data: data.data,
+        data: data.data ?? { taskId: data.taskId },
         vibrate: [200, 100, 200],
       } as NotificationOptions & { vibrate?: number[] })
     );
