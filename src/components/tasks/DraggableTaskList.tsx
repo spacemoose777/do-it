@@ -125,9 +125,13 @@ export default function DraggableTaskList({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleToggleComplete = useCallback((id: string) => {
+    // Start the fade animation and the actual toggle simultaneously.
+    // Previously the toggle was delayed 300 ms which opened a window for a
+    // concurrent sync-triggered loadTasks to reset the tasks state to [] —
+    // the subsequent applyFilter on an empty prev then wiped the whole list.
     setFadingIds((prev) => new Set([...prev, id]));
+    onToggleComplete(id);
     setTimeout(() => {
-      onToggleComplete(id);
       setFadingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
     }, 300);
   }, [onToggleComplete]);
