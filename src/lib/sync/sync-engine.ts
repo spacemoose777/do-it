@@ -74,11 +74,13 @@ async function pushSingleItem(userId: string, item: SyncQueueItem): Promise<void
 }
 
 export async function pullChanges(userId: string): Promise<void> {
-  // Fetch everything from Firestore up front
+  // Always fetch from the server to avoid returning stale or empty data from
+  // the Firebase persistence cache, which can be empty immediately after the
+  // SDK initialises its async local storage layer.
   const [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
-    getDocs(taskListsCol(userId)),
-    getDocs(tasksCol(userId)),
-    getDocs(subtasksCol(userId)),
+    getDocsFromServer(taskListsCol(userId)),
+    getDocsFromServer(tasksCol(userId)),
+    getDocsFromServer(subtasksCol(userId)),
   ]);
 
   // Build local lookup maps so we can do conflict resolution in O(1)
