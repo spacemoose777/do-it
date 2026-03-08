@@ -14,22 +14,23 @@ export const sendReminders = onSchedule(
     const now = new Date();
     const nowISO = now.toISOString();
 
-    // Find all incomplete tasks with a reminder due now or in the past
+    // Collection group query — searches users/{uid}/tasks across all users
     const tasksSnap = await db
-      .collection("tasks")
+      .collectionGroup("tasks")
       .where("reminder_at", "<=", nowISO)
       .get();
 
     if (tasksSnap.empty) return;
 
-    // Group tasks by user
+    // Group tasks by user — uid comes from the doc path (users/{uid}/tasks/{taskId})
+    // because user_id is stripped from the Firestore doc when pushed by the client
     const byUser = new Map<string, TaskDoc[]>();
     for (const doc of tasksSnap.docs) {
       const data = doc.data();
       if (data["is_completed"] === true) continue;
       if (!data["reminder_at"]) continue;
 
-      const uid = data["user_id"] as string;
+      const uid = doc.ref.parent.parent?.id;
       if (!uid) continue;
       if (!byUser.has(uid)) byUser.set(uid, []);
       byUser.get(uid)!.push(doc);
