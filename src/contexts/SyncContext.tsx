@@ -73,7 +73,19 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         }
         if (loadErr) throw loadErr;
       } else {
-        await fullSync(user.uid);
+        // Retry fullSync up to 3 times on transient network failures
+        let syncErr: unknown;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await fullSync(user.uid);
+            syncErr = undefined;
+            break;
+          } catch (e) {
+            syncErr = e;
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          }
+        }
+        if (syncErr) throw syncErr;
       }
 
       const count = await pendingCount();

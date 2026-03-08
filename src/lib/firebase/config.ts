@@ -1,11 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import {
-  initializeFirestore,
-  getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -17,28 +12,10 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-// Initialize Firebase (prevent duplicate initialization in dev)
-const isNewApp = getApps().length === 0;
-const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
+// Prevent duplicate initialization in dev / HMR
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
 const auth = getAuth(app);
-
-// Enable offline persistence so Firestore works while briefly offline.
-// initializeFirestore must only be called once per app instance — guard with isNewApp.
-// Wrapped in try/catch: if persistence setup fails (browser restriction, Safari
-// ITP, incognito, etc.) we fall through to plain getFirestore() below which
-// still works for online use, preventing a total data-loading failure.
-if (isNewApp && typeof window !== "undefined") {
-  try {
-    initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    });
-  } catch {
-    // Persistence unavailable — Firestore will work online without cache
-  }
-}
-
 const db = getFirestore(app);
 const storage = getStorage(app);
 
