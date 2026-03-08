@@ -51,39 +51,27 @@ export function getDB(): Promise<IDBPDatabase<DoItDB>> {
 
   if (!dbPromise) {
     dbPromise = openDB<DoItDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, _newVersion, transaction) {
-        if (oldVersion < 1) {
-          // Tasks store
-          const taskStore = db.createObjectStore("tasks", { keyPath: "id" });
-          taskStore.createIndex("by-list", "list_id");
-          taskStore.createIndex("by-user", "user_id");
-          taskStore.createIndex("by-due-date", "due_date");
+      upgrade(db) {
+        // Tasks store
+        const taskStore = db.createObjectStore("tasks", { keyPath: "id" });
+        taskStore.createIndex("by-list", "list_id");
+        taskStore.createIndex("by-user", "user_id");
+        taskStore.createIndex("by-due-date", "due_date");
 
-          // Subtasks store
-          const subtaskStore = db.createObjectStore("subtasks", { keyPath: "id" });
-          subtaskStore.createIndex("by-task", "task_id");
+        // Subtasks store
+        const subtaskStore = db.createObjectStore("subtasks", { keyPath: "id" });
+        subtaskStore.createIndex("by-task", "task_id");
 
-          // Task lists store
-          const listStore = db.createObjectStore("task_lists", { keyPath: "id" });
-          listStore.createIndex("by-user", "user_id");
+        // Task lists store
+        const listStore = db.createObjectStore("task_lists", { keyPath: "id" });
+        listStore.createIndex("by-user", "user_id");
 
-          // Sync queue store
-          const syncStore = db.createObjectStore("sync_queue", { keyPath: "id" });
-          syncStore.createIndex("by-created", "created_at");
+        // Sync queue store
+        const syncStore = db.createObjectStore("sync_queue", { keyPath: "id" });
+        syncStore.createIndex("by-created", "created_at");
 
-          // Meta store (last sync time, etc.)
-          db.createObjectStore("meta", { keyPath: "key" });
-        }
-
-        if (oldVersion < 2) {
-          // Clear stale sync queue items accumulated from a bug where loadTasks
-          // enqueued UPDATE operations before the first sync completed, causing
-          // local timestamps to win conflict resolution and discard server data.
-          // Also clear last_sync so the next startup does a clean initialLoad
-          // from the server instead of a potentially corrupted fullSync.
-          transaction.objectStore("sync_queue").clear();
-          transaction.objectStore("meta").clear();
-        }
+        // Meta store (last sync time, etc.)
+        db.createObjectStore("meta", { keyPath: "key" });
       },
     });
   }
@@ -240,6 +228,11 @@ export async function getMeta(key: string): Promise<string | undefined> {
 export async function setMeta(key: string, value: string): Promise<void> {
   const db = await getDB();
   await db.put("meta", { key, value });
+}
+
+export async function deleteMeta(key: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("meta", key);
 }
 
 // =====================================================

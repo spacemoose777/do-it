@@ -5,7 +5,12 @@ import { useAuth } from "./AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { fullSync, initialLoad } from "@/lib/sync/sync-engine";
 import { pendingCount } from "@/lib/sync/sync-queue";
-import { getMeta } from "@/lib/db/indexed-db";
+import { getMeta, deleteMeta, clearSyncQueue } from "@/lib/db/indexed-db";
+
+// Bump this string to force a one-time resync on all clients.
+// It clears the stale sync queue and resets last_sync so the next startup
+// runs initialLoad (full fresh pull from the server) automatically.
+const SYNC_MIGRATION_KEY = "do-it-sync-migration-v3";
 import type { SyncState } from "@/types/sync";
 
 interface SyncContextType extends SyncState {
@@ -38,6 +43,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
     try {
+      // One-time migration: clear stale queue items and reset last_sync so that
+      // initialLoad runs on the next startup, pulling a clean copy from the server.
+      if (!localStorage.getItem(SYNC_MIGRATION_KEY)) {
+        await clearSyncQueue();
+        await deleteMeta("last_sync");
+        localStorage.setItem(SYNC_MIGRATION_KEY, "1");
+      }
+
       // Check if we need an initial load
       const lastSync = await getMeta("last_sync");
       if (!lastSync) {
