@@ -57,6 +57,9 @@ export function useTasks(filter?: {
   const loadTasks = useCallback(async () => {
     if (!user) return;
 
+    // Capture whether we've ever synced BEFORE any async work
+    const hasSynced = !!lastSyncedAt;
+
     let data: Task[];
 
     if (filter?.listId) {
@@ -71,10 +74,14 @@ export function useTasks(filter?: {
     // Clear stale My Day items
     const cleaned = clearStaleMyDay(data);
     const staleItems = data.filter((t, i) => t !== cleaned[i]);
-    for (const task of staleItems) {
-      const cleanedTask = cleaned.find((c) => c.id === task.id)!;
-      await idb.putTask(cleanedTask);
-      await enqueue("tasks", task.id, "UPDATE", cleanedTask as unknown as Record<string, unknown>);
+    // Only write cleanup to IDB and enqueue after first sync — otherwise we'd
+    // overwrite fresh server data with stale local state during conflict resolution.
+    if (hasSynced) {
+      for (const task of staleItems) {
+        const cleanedTask = cleaned.find((c) => c.id === task.id)!;
+        await idb.putTask(cleanedTask);
+        await enqueue("tasks", task.id, "UPDATE", cleanedTask as unknown as Record<string, unknown>);
+      }
     }
     data = cleaned;
 
@@ -108,8 +115,11 @@ export function useTasks(filter?: {
           updated_at: nowISOString(),
         };
         data = data.map((t) => (t.id === task.id ? updatedTask : t));
-        await idb.putTask(updatedTask);
-        await enqueue("tasks", task.id, "UPDATE", updatedTask as unknown as Record<string, unknown>);
+        // Only persist and enqueue after first sync to avoid clobbering server data
+        if (hasSynced) {
+          await idb.putTask(updatedTask);
+          await enqueue("tasks", task.id, "UPDATE", updatedTask as unknown as Record<string, unknown>);
+        }
       }
     }
 
@@ -126,7 +136,7 @@ export function useTasks(filter?: {
     setTasks(data);
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, filter?.listId, filter?.myDay, filter?.dueTomorrow, filter?.important, filter?.planned, filter?.includeCompleted]);
+  }, [user, lastSyncedAt, filter?.listId, filter?.myDay, filter?.dueTomorrow, filter?.important, filter?.planned, filter?.includeCompleted]);
 
   useEffect(() => {
     loadTasks();

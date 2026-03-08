@@ -9,6 +9,17 @@ export async function enqueue(
   operation: SyncOperation,
   data: Record<string, unknown> = {}
 ): Promise<void> {
+  // Deduplicate UPDATE entries: replace any existing pending UPDATE for the same record
+  if (operation === "UPDATE") {
+    const existing = await getAllSyncQueue();
+    const duplicate = existing.find(
+      (item) => item.table_name === tableName && item.record_id === recordId && item.operation === "UPDATE"
+    );
+    if (duplicate) {
+      await removeSyncQueueItem(duplicate.id);
+    }
+  }
+
   const item: SyncQueueItem = {
     id: uuidv4(),
     table_name: tableName,
