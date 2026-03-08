@@ -4,9 +4,7 @@ import {
   setDoc,
   deleteDoc,
   getDocsFromServer,
-  query,
-  where,
-  Timestamp,
+  enableNetwork,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import * as idb from "@/lib/db/indexed-db";
@@ -73,9 +71,12 @@ async function pushSingleItem(userId: string, item: SyncQueueItem): Promise<void
 }
 
 export async function pullChanges(userId: string): Promise<void> {
-  // Always fetch from the server to avoid returning stale or empty data from
-  // the Firebase persistence cache, which can be empty immediately after the
-  // SDK initialises its async local storage layer.
+  // enableNetwork() is a no-op if already connected, but if the Firestore SDK
+  // has internally marked itself as offline (can happen transiently on init or
+  // after a background tab resumes), this brings it back online so
+  // getDocsFromServer doesn't immediately throw [code=unavailable].
+  await enableNetwork(db).catch(() => {});
+
   const [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
     getDocsFromServer(taskListsCol(userId)),
     getDocsFromServer(tasksCol(userId)),
@@ -160,9 +161,9 @@ export async function fullSync(userId: string): Promise<{ pushed: number; errors
 }
 
 export async function initialLoad(userId: string): Promise<void> {
-  // Full load from server on first login / empty local DB.
-  // getDocsFromServer always fetches live data — no local cache to go stale.
-  // If the server is unreachable this throws, and SyncContext will retry.
+  // Ensure the Firestore SDK is in an online state before attempting the load.
+  await enableNetwork(db).catch(() => {});
+
   const [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
     getDocsFromServer(taskListsCol(userId)),
     getDocsFromServer(tasksCol(userId)),

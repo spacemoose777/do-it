@@ -6,13 +6,19 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { fullSync, initialLoad, pushChanges } from "@/lib/sync/sync-engine";
 import { pendingCount } from "@/lib/sync/sync-queue";
 import { deleteMeta, getMeta } from "@/lib/db/indexed-db";
+import type { SyncState } from "@/types/sync";
 
 // Bump this string to force a one-time full resync on all clients.
-// v5: push pending local changes first, then clear last_sync so initialLoad
-// fetches a fresh copy from Firestore. Non-destructive — IDB is not wiped,
-// so tasks are not lost if the network is unavailable during migration.
 const SYNC_MIGRATION_KEY = "do-it-sync-migration-v5";
-import type { SyncState } from "@/types/sync";
+
+// Safe localStorage helpers — localStorage can throw in Safari Private Browsing
+// and some WebView environments. Failures are silent so they don't break sync.
+function lsGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function lsSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* ignore */ }
+}
 
 interface SyncContextType extends SyncState {
   triggerSync: () => Promise<void>;
@@ -44,45 +50,45 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
     try {
-      // One-time migration: push any pending local changes, then force a fresh
-      // initialLoad from Firestore so stale local records are overwritten by
-      // authoritative server data.
-      if (!localStorage.getItem(SYNC_MIGRATION_KEY)) {
-        // Flush pending queue first so local changes aren't lost
+      // Ensure the Firebase Auth ID token is refreshed before making any
+      // Firestore requests. onAuthStateChanged can fire while the token is
+      // still being refreshed asynchronously; getDocsFromServer (unlike getDocs)
+      // does not tolerate an unready auth state and will throw immediately.
+      await user.getIdToken(/* forceRefresh */ false);
+
+      // One-time migration: push pending local changes, then force initialLoad.
+      if (!lsGet(SYNC_MIGRATION_KEY)) {
         await pushChanges(user.uid);
-        // Clear last_sync so the initialLoad branch below runs
         await deleteMeta("last_sync");
-        localStorage.setItem(SYNC_MIGRATION_KEY, "1");
+        lsSet(SYNC_MIGRATION_KEY, "1");
       }
 
-      // Check if we need an initial load
+      // Decide: initial load (first ever sync) or incremental sync.
       const lastSync = await getMeta("last_sync");
       if (!lastSync) {
-        // Retry initialLoad up to 3 times — a transient network error should
-        // not leave the app permanently empty.
         let loadErr: unknown;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 5; attempt++) {
           try {
             await initialLoad(user.uid);
             loadErr = undefined;
             break;
           } catch (e) {
             loadErr = e;
-            if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            // Back-off: 1s, 2s, 4s, 8s
+            if (attempt < 4) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
           }
         }
         if (loadErr) throw loadErr;
       } else {
-        // Retry fullSync up to 3 times on transient network failures
         let syncErr: unknown;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 5; attempt++) {
           try {
             await fullSync(user.uid);
             syncErr = undefined;
             break;
           } catch (e) {
             syncErr = e;
-            if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            if (attempt < 4) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
           }
         }
         if (syncErr) throw syncErr;
@@ -98,7 +104,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       isSyncingRef.current = false;
-      const message = err instanceof Error ? err.message : "Sync failed";
+      // Surface the real Firebase error code so it is visible in the UI
+      // (e.g. "permission-denied", "unavailable", "unauthenticated").
+      const message =
+        err instanceof Error
+          ? (err as any).code
+            ? `${(err as any).code}: ${err.message}`
+            : err.message
+          : "Sync failed";
       console.error("[SyncContext] Sync failed:", err);
       setState((prev) => ({
         ...prev,

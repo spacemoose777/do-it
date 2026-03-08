@@ -156,7 +156,7 @@ export default function BottomNav() {
           onClick={triggerSync}
           className="w-full text-xs text-red-400 bg-red-400/10 px-3 py-1.5 text-left hover:bg-red-400/20 transition-colors"
         >
-          ⚠ Sync failed — tap to retry
+          ⚠ Sync error: {syncError} — tap to retry
         </button>
       )}
       <div
