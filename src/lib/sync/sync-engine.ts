@@ -150,9 +150,10 @@ export async function pullChanges(userId: string): Promise<void> {
 }
 
 export async function fullSync(userId: string): Promise<{ pushed: number; errors: number }> {
-  // Push local changes first, then pull server changes
-  const result = await pushChanges(userId);
+  // Pull server changes first so local IDB reflects server truth before we push.
+  // This prevents stale local timestamps from winning conflict resolution.
   await pullChanges(userId);
+  const result = await pushChanges(userId);
   return result;
 }
 

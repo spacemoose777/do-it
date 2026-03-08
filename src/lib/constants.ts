@@ -1,7 +1,7 @@
 export const APP_NAME = "Do It";
 export const DEFAULT_LIST_NAME = "Tasks";
 export const DB_NAME = "do-it-db";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const SORT_OPTIONS = [
   { value: "created_at", label: "Date created" },
