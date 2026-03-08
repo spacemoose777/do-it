@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, deleteDB, type DBSchema, type IDBPDatabase } from "idb";
 import { DB_NAME, DB_VERSION } from "@/lib/constants";
 import type { Task, Subtask, TaskList } from "@/types/task";
 import type { SyncQueueItem } from "@/types/sync";
@@ -51,28 +51,39 @@ export function getDB(): Promise<IDBPDatabase<DoItDB>> {
 
   if (!dbPromise) {
     dbPromise = openDB<DoItDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        // Tasks store
-        const taskStore = db.createObjectStore("tasks", { keyPath: "id" });
-        taskStore.createIndex("by-list", "list_id");
-        taskStore.createIndex("by-user", "user_id");
-        taskStore.createIndex("by-due-date", "due_date");
+      upgrade(db, oldVersion) {
+        // Only create stores on fresh install (oldVersion === 0).
+        // Upgrading from any prior version needs no schema changes — data
+        // migration is handled by the SyncContext migration flag instead.
+        if (oldVersion === 0) {
+          const taskStore = db.createObjectStore("tasks", { keyPath: "id" });
+          taskStore.createIndex("by-list", "list_id");
+          taskStore.createIndex("by-user", "user_id");
+          taskStore.createIndex("by-due-date", "due_date");
 
-        // Subtasks store
-        const subtaskStore = db.createObjectStore("subtasks", { keyPath: "id" });
-        subtaskStore.createIndex("by-task", "task_id");
+          const subtaskStore = db.createObjectStore("subtasks", { keyPath: "id" });
+          subtaskStore.createIndex("by-task", "task_id");
 
-        // Task lists store
-        const listStore = db.createObjectStore("task_lists", { keyPath: "id" });
-        listStore.createIndex("by-user", "user_id");
+          const listStore = db.createObjectStore("task_lists", { keyPath: "id" });
+          listStore.createIndex("by-user", "user_id");
 
-        // Sync queue store
-        const syncStore = db.createObjectStore("sync_queue", { keyPath: "id" });
-        syncStore.createIndex("by-created", "created_at");
+          const syncStore = db.createObjectStore("sync_queue", { keyPath: "id" });
+          syncStore.createIndex("by-created", "created_at");
 
-        // Meta store (last sync time, etc.)
-        db.createObjectStore("meta", { keyPath: "key" });
+          db.createObjectStore("meta", { keyPath: "key" });
+        }
       },
+    }).catch(async (err: unknown) => {
+      // A VersionError means the browser's IDB is at a higher version than
+      // DB_VERSION (can happen if a version bump was deployed and then
+      // reverted).  Wipe and recreate so the app can function again — data
+      // will be re-fetched from Firestore via the SyncContext migration.
+      if (err instanceof Error && (err.name === "VersionError" || err.name === "AbortError")) {
+        dbPromise = null;
+        await deleteDB(DB_NAME).catch(() => {});
+        return getDB();
+      }
+      throw err;
     });
   }
 

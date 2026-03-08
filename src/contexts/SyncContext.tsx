@@ -5,12 +5,13 @@ import { useAuth } from "./AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { fullSync, initialLoad } from "@/lib/sync/sync-engine";
 import { pendingCount } from "@/lib/sync/sync-queue";
-import { getMeta, deleteMeta, clearSyncQueue } from "@/lib/db/indexed-db";
+import { clearAllData, getMeta } from "@/lib/db/indexed-db";
 
-// Bump this string to force a one-time resync on all clients.
-// It clears the stale sync queue and resets last_sync so the next startup
-// runs initialLoad (full fresh pull from the server) automatically.
-const SYNC_MIGRATION_KEY = "do-it-sync-migration-v3";
+// Bump this string to force a one-time full resync on all clients.
+// v4: clearAllData() wipes every IDB store so stale local records can't
+// survive conflict resolution — the next triggerSync runs initialLoad
+// and gets a completely fresh copy from Firestore.
+const SYNC_MIGRATION_KEY = "do-it-sync-migration-v4";
 import type { SyncState } from "@/types/sync";
 
 interface SyncContextType extends SyncState {
@@ -46,8 +47,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       // One-time migration: clear stale queue items and reset last_sync so that
       // initialLoad runs on the next startup, pulling a clean copy from the server.
       if (!localStorage.getItem(SYNC_MIGRATION_KEY)) {
-        await clearSyncQueue();
-        await deleteMeta("last_sync");
+        // Wipe all local IDB data so stale records can't outlive a fresh pull
+        await clearAllData();
         localStorage.setItem(SYNC_MIGRATION_KEY, "1");
       }
 

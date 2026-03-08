@@ -1,6 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -13,8 +18,21 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (prevent duplicate initialization in dev)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const isNewApp = getApps().length === 0;
+const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+
+// Enable offline persistence so getDocs() returns cached data instead of
+// hanging indefinitely when the device has no internet connection.
+// initializeFirestore must only be called once per app instance — guard with isNewApp.
+if (isNewApp && typeof window !== "undefined") {
+  initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+}
+
 const db = getFirestore(app);
 const storage = getStorage(app);
 
