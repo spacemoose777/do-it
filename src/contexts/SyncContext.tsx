@@ -3,15 +3,15 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { fullSync, initialLoad } from "@/lib/sync/sync-engine";
+import { fullSync, initialLoad, pushChanges } from "@/lib/sync/sync-engine";
 import { pendingCount } from "@/lib/sync/sync-queue";
-import { clearAllData, getMeta } from "@/lib/db/indexed-db";
+import { deleteMeta, getMeta } from "@/lib/db/indexed-db";
 
 // Bump this string to force a one-time full resync on all clients.
-// v4: clearAllData() wipes every IDB store so stale local records can't
-// survive conflict resolution — the next triggerSync runs initialLoad
-// and gets a completely fresh copy from Firestore.
-const SYNC_MIGRATION_KEY = "do-it-sync-migration-v4";
+// v5: push pending local changes first, then clear last_sync so initialLoad
+// fetches a fresh copy from Firestore. Non-destructive — IDB is not wiped,
+// so tasks are not lost if the network is unavailable during migration.
+const SYNC_MIGRATION_KEY = "do-it-sync-migration-v5";
 import type { SyncState } from "@/types/sync";
 
 interface SyncContextType extends SyncState {
@@ -44,11 +44,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isSyncing: true, error: null }));
 
     try {
-      // One-time migration: clear stale queue items and reset last_sync so that
-      // initialLoad runs on the next startup, pulling a clean copy from the server.
+      // One-time migration: push any pending local changes, then force a fresh
+      // initialLoad from Firestore so stale local records are overwritten by
+      // authoritative server data.
       if (!localStorage.getItem(SYNC_MIGRATION_KEY)) {
-        // Wipe all local IDB data so stale records can't outlive a fresh pull
-        await clearAllData();
+        // Flush pending queue first so local changes aren't lost
+        await pushChanges(user.uid);
+        // Clear last_sync so the initialLoad branch below runs
+        await deleteMeta("last_sync");
         localStorage.setItem(SYNC_MIGRATION_KEY, "1");
       }
 
