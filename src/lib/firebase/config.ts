@@ -22,15 +22,21 @@ const isNewApp = getApps().length === 0;
 const app = isNewApp ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
-// Enable offline persistence so getDocs() returns cached data instead of
-// hanging indefinitely when the device has no internet connection.
+// Enable offline persistence so Firestore works while briefly offline.
 // initializeFirestore must only be called once per app instance — guard with isNewApp.
+// Wrapped in try/catch: if persistence setup fails (browser restriction, Safari
+// ITP, incognito, etc.) we fall through to plain getFirestore() below which
+// still works for online use, preventing a total data-loading failure.
 if (isNewApp && typeof window !== "undefined") {
-  initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
-  });
+  try {
+    initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch {
+    // Persistence unavailable — Firestore will work online without cache
+  }
 }
 
 const db = getFirestore(app);

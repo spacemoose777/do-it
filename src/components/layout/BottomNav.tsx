@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
+import { useSync } from "@/contexts/SyncContext";
 
 const navIcons: Record<string, (active: boolean) => JSX.Element> = {
   sun: (active) => (
@@ -57,6 +58,7 @@ function loadNavOrder(): string[] {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { error: syncError, triggerSync } = useSync();
   const [navOrder, setNavOrder] = useState<string[]>(loadNavOrder);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragTo, setDragTo] = useState<number | null>(null);
@@ -149,6 +151,14 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-secondary border-t border-border z-40">
+      {syncError && (
+        <button
+          onClick={triggerSync}
+          className="w-full text-xs text-red-400 bg-red-400/10 px-3 py-1.5 text-left hover:bg-red-400/20 transition-colors"
+        >
+          ⚠ Sync failed — tap to retry
+        </button>
+      )}
       <div
         ref={containerRef}
         className="flex items-center justify-around h-16 px-2"

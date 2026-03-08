@@ -107,19 +107,18 @@ export function useTasks(filter?: {
       });
       let nextOrder = minExistingOrder - sortedToAutoAdd.length;
       for (const task of sortedToAutoAdd) {
+        // Auto-add is display-only: update the in-memory list so the task
+        // appears in My Day, but do NOT write to IDB or enqueue a Firestore
+        // push. Writing updated_at: now() here caused the web to win conflict
+        // resolution against the app's completed status, making completed tasks
+        // "come back" after being ticked off on the phone.
         const updatedTask: Task = {
           ...task,
           is_my_day: true,
           my_day_date: today,
           my_day_sort_order: nextOrder++,
-          updated_at: nowISOString(),
         };
         data = data.map((t) => (t.id === task.id ? updatedTask : t));
-        // Only persist and enqueue after first sync to avoid clobbering server data
-        if (hasSynced) {
-          await idb.putTask(updatedTask);
-          await enqueue("tasks", task.id, "UPDATE", updatedTask as unknown as Record<string, unknown>);
-        }
       }
     }
 

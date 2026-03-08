@@ -58,7 +58,20 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       // Check if we need an initial load
       const lastSync = await getMeta("last_sync");
       if (!lastSync) {
-        await initialLoad(user.uid);
+        // Retry initialLoad up to 3 times — a transient network error should
+        // not leave the app permanently empty.
+        let loadErr: unknown;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await initialLoad(user.uid);
+            loadErr = undefined;
+            break;
+          } catch (e) {
+            loadErr = e;
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          }
+        }
+        if (loadErr) throw loadErr;
       } else {
         await fullSync(user.uid);
       }
@@ -73,10 +86,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       isSyncingRef.current = false;
+      const message = err instanceof Error ? err.message : "Sync failed";
+      console.error("[SyncContext] Sync failed:", err);
       setState((prev) => ({
         ...prev,
         isSyncing: false,
-        error: err instanceof Error ? err.message : "Sync failed",
+        error: message,
       }));
     }
   }, [user, isOnline]);

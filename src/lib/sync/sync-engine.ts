@@ -4,6 +4,7 @@ import {
   setDoc,
   deleteDoc,
   getDocs,
+  getDocsFromServer,
   query,
   where,
   Timestamp,
@@ -158,12 +159,27 @@ export async function fullSync(userId: string): Promise<{ pushed: number; errors
 }
 
 export async function initialLoad(userId: string): Promise<void> {
-  // Full load from server on first login / empty local DB
-  const [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
-    getDocs(taskListsCol(userId)),
-    getDocs(tasksCol(userId)),
-    getDocs(subtasksCol(userId)),
-  ]);
+  // Full load from server on first login / empty local DB.
+  // Use getDocsFromServer to bypass the Firebase persistence cache — the cache
+  // may be empty or stale if the browser session is new or the cache was just
+  // set up for the first time, causing getDocs() to return no results even
+  // though Firestore has data. Fall back to getDocs() if the server fetch fails
+  // (e.g. offline) so the cache still has a chance to return something.
+  let listsSnap, tasksSnap, subtasksSnap;
+  try {
+    [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
+      getDocsFromServer(taskListsCol(userId)),
+      getDocsFromServer(tasksCol(userId)),
+      getDocsFromServer(subtasksCol(userId)),
+    ]);
+  } catch {
+    // Offline or server unreachable — fall back to cached data
+    [listsSnap, tasksSnap, subtasksSnap] = await Promise.all([
+      getDocs(taskListsCol(userId)),
+      getDocs(tasksCol(userId)),
+      getDocs(subtasksCol(userId)),
+    ]);
+  }
 
   const lists = listsSnap.docs.map((d) => ({ ...d.data(), id: d.id, user_id: userId } as TaskList));
   const tasks = tasksSnap.docs.map((d) => ({ ...d.data(), id: d.id, user_id: userId } as Task));

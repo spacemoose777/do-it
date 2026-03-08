@@ -40,7 +40,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { lists } = useTaskLists();
   const { user, signOut } = useAuth();
-  const { pendingCount, isSyncing } = useSync();
+  const { pendingCount, isSyncing, error: syncError, triggerSync } = useSync();
 
   return (
     <aside className="hidden md:flex flex-col w-[280px] h-screen bg-bg-secondary border-r border-border">
@@ -62,6 +62,15 @@ export default function Sidebar() {
             <span className="ml-auto text-xs text-accent animate-pulse">syncing...</span>
           )}
         </div>
+        {syncError && (
+          <button
+            onClick={triggerSync}
+            className="mt-2 w-full text-left text-xs text-red-400 bg-red-400/10 px-2 py-1.5 rounded-lg hover:bg-red-400/20 transition-colors"
+            title={syncError}
+          >
+            ⚠ Sync failed — tap to retry
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
