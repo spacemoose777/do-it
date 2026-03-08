@@ -10,6 +10,16 @@ export interface TaskList {
   updated_at: string;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  path: string;
+  uploadedAt: string;
+}
+
 export interface Task {
   id: string;
   user_id: string;
@@ -30,6 +40,7 @@ export interface Task {
   sort_order: number;
   my_day_sort_order: number | null;
   priority: number | null;
+  attachments: Attachment[];
   created_at: string;
   updated_at: string;
 }

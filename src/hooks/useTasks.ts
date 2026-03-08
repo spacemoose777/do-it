@@ -21,6 +21,7 @@ function normalizeTask(task: Task): Task {
     priority: task.priority ?? null,
     my_day_sort_order: task.my_day_sort_order ?? null,
     is_in_progress: task.is_in_progress ?? false,
+    attachments: task.attachments ?? [],
   };
 }
 
@@ -197,6 +198,7 @@ export function useTasks(filter?: {
       sort_order: input.sort_order || 0,
       my_day_sort_order: myDaySortOrder,
       priority: input.priority ?? null,
+      attachments: input.attachments ?? [],
       created_at: now,
       updated_at: now,
     };

@@ -9,6 +9,7 @@ import TimePicker from "@/components/ui/TimePicker";
 import RecurrencePicker from "./RecurrencePicker";
 import ReminderPicker from "./ReminderPicker";
 import SubtaskList from "./SubtaskList";
+import AttachmentSection from "./AttachmentSection";
 import type { Task, TaskUpdateInput } from "@/types/task";
 
 interface TaskDetailProps {
@@ -289,6 +290,12 @@ export default function TaskDetail({
               />
             </div>
           )}
+        </div>
+
+        {/* Attachments */}
+        <div>
+          <p className="text-xs text-text-secondary mb-2">Attachments</p>
+          <AttachmentSection task={task} onUpdate={onUpdate} />
         </div>
 
         {/* Notes */}
