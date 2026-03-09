@@ -261,7 +261,6 @@ export function useTasks(filter?: {
       ...normalizedExisting,
       is_completed: isCompleting,
       completed_at: isCompleting ? now : null,
-      ...(isCompleting ? { is_my_day: false, my_day_date: null, my_day_sort_order: null } : {}),
       updated_at: now,
     };
 
@@ -348,9 +347,20 @@ export function useTasks(filter?: {
     if (!existing) return;
 
     const normalizedExisting = normalizeTask(existing);
+    const settingInProgress = !normalizedExisting.is_in_progress;
+
+    // Move to top of My Day when marking in-progress
+    let myDaySortOrder = normalizedExisting.my_day_sort_order;
+    if (settingInProgress && normalizedExisting.is_my_day) {
+      const myDayTasks = tasks.filter((t) => t.is_my_day && !t.is_completed);
+      const minOrder = myDayTasks.length === 0 ? 0 : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+      myDaySortOrder = minOrder - 1;
+    }
+
     const updated: Task = {
       ...normalizedExisting,
-      is_in_progress: !normalizedExisting.is_in_progress,
+      is_in_progress: settingInProgress,
+      my_day_sort_order: myDaySortOrder,
       updated_at: nowISOString(),
     };
 
@@ -358,7 +368,7 @@ export function useTasks(filter?: {
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
     setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     return updated;
-  }, []);
+  }, [tasks]);
 
   const deleteTask = useCallback(async (id: string) => {
     await idb.deleteTask(id);

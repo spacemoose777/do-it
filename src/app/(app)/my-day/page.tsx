@@ -18,7 +18,7 @@ export default function MyDayPage() {
     tasks, loading, sortBy, setSortBy,
     createTask, updateTask, toggleComplete, toggleImportant,
     toggleMyDay, toggleInProgress, deleteTask, batchReorderMyDay,
-  } = useTasks({ myDay: true });
+  } = useTasks({ myDay: true, includeCompleted: true });
   const { lists, getDefaultList } = useTaskLists();
   const { selectedTask, setSelectedTask, openTask, closeTask } = useTaskPanel();
 

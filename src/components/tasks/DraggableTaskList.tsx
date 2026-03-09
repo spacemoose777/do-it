@@ -42,6 +42,7 @@ export default function DraggableTaskList({
     });
 
   const [localOrder, setLocalOrder] = useState<Task[]>(() => sortByMyDayOrder(incomplete));
+  const [showCompleted, setShowCompleted] = useState(true);
   const [subtaskCounts, setSubtaskCounts] = useState<Record<string, SubtaskCount>>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
@@ -56,11 +57,25 @@ export default function DraggableTaskList({
   const touchStartY = useRef(0);
   const touchStartX = useRef(0);
 
-  // Sync local order when the incoming tasks list changes (not during a drag)
+  // Sync local order when the incoming tasks list changes (not during a drag).
+  // Preserves drag-ordered positions for existing tasks; new tasks are inserted
+  // at the top rather than re-sorting everything (which caused snap-to-bottom).
   useEffect(() => {
-    if (!isDragging.current) {
-      setLocalOrder(sortByMyDayOrder(incomplete));
-    }
+    if (isDragging.current) return;
+    setLocalOrder((prev) => {
+      const incompleteMap = new Map(incomplete.map((t) => [t.id, t]));
+      const prevIds = new Set(prev.map((t) => t.id));
+
+      // New tasks not previously in the list → sort them and prepend
+      const added = incomplete.filter((t) => !prevIds.has(t.id));
+
+      // Existing tasks → update data but keep visual order
+      const kept = prev
+        .filter((t) => incompleteMap.has(t.id))
+        .map((t) => incompleteMap.get(t.id)!);
+
+      return added.length > 0 ? [...sortByMyDayOrder(added), ...kept] : kept;
+    });
   }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load subtask counts — only when the set of task IDs actually changes
@@ -269,26 +284,37 @@ export default function DraggableTaskList({
       )}
 
       {completed.length > 0 && (
-        <details className="mt-4">
-          <summary className="px-4 py-2 text-sm text-text-secondary cursor-pointer hover:text-text-primary">
+        <div className="mt-4">
+          <button
+            onClick={() => setShowCompleted((v) => !v)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm text-text-secondary hover:text-text-primary w-full text-left"
+          >
+            <svg
+              className={cn("w-3.5 h-3.5 transition-transform", showCompleted ? "rotate-90" : "")}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
             Completed ({completed.length})
-          </summary>
-          <div className="space-y-1 mt-1">
-            {completed.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggleComplete={onToggleComplete}
-                onToggleImportant={onToggleImportant}
-                onToggleInProgress={onToggleInProgress}
-                onClick={onTaskClick}
-                onDelete={onDelete}
-                subtaskTotal={subtaskCounts[task.id]?.total}
-                subtaskCompleted={subtaskCounts[task.id]?.completed}
-              />
-            ))}
-          </div>
-        </details>
+          </button>
+          {showCompleted && (
+            <div className="space-y-1 mt-1">
+              {completed.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggleComplete={onToggleComplete}
+                  onToggleImportant={onToggleImportant}
+                  onToggleInProgress={onToggleInProgress}
+                  onClick={onTaskClick}
+                  onDelete={onDelete}
+                  subtaskTotal={subtaskCounts[task.id]?.total}
+                  subtaskCompleted={subtaskCounts[task.id]?.completed}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
