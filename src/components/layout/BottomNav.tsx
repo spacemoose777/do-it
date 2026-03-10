@@ -63,11 +63,35 @@ export default function BottomNav() {
   const containerRef = useRef<HTMLDivElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
   const pointerStartPos = useRef({ x: 0, y: 0 });
+  // Refs mirror drag state so event handlers always read current values,
+  // avoiding the stale-closure race where pointerup fires before the
+  // setState from the 500 ms timer has caused a re-render.
+  const dragFromRef = useRef<number | null>(null);
+  const dragToRef = useRef<number | null>(null);
 
   const isDragging = dragFrom !== null;
 
   useEffect(() => {
     return () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
+  }, []);
+
+  // Safety net: if pointerup fires outside the nav container (rare browser quirk
+  // or mid-render capture loss), still reset drag state so the nav never stays frozen.
+  useEffect(() => {
+    const reset = () => {
+      if (dragFromRef.current === null) return;
+      clearTimeout(longPressTimer.current);
+      dragFromRef.current = null;
+      dragToRef.current = null;
+      setDragFrom(null);
+      setDragTo(null);
+    };
+    window.addEventListener("pointerup", reset);
+    window.addEventListener("pointercancel", reset);
+    return () => {
+      window.removeEventListener("pointerup", reset);
+      window.removeEventListener("pointercancel", reset);
+    };
   }, []);
 
   const orderedItems = navOrder.map((href) => NAV_ITEMS.find((i) => i.href === href)!);
@@ -100,7 +124,7 @@ export default function BottomNav() {
 
   const handleItemPointerDown = useCallback(
     (e: React.PointerEvent, index: number) => {
-      if (isDragging) return;
+      if (dragFromRef.current !== null) return;
       pointerStartPos.current = { x: e.clientX, y: e.clientY };
       const el = e.currentTarget as HTMLElement;
       const pointerId = e.pointerId;
@@ -110,17 +134,19 @@ export default function BottomNav() {
         } catch {
           return;
         }
+        dragFromRef.current = index;
+        dragToRef.current = index;
         setDragFrom(index);
         setDragTo(index);
         navigator.vibrate?.(50);
       }, 500);
     },
-    [isDragging]
+    []
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isDragging) {
+      if (dragFromRef.current === null) {
         const dx = Math.abs(e.clientX - pointerStartPos.current.x);
         const dy = Math.abs(e.clientY - pointerStartPos.current.y);
         if (dx > 8 || dy > 8) {
@@ -129,23 +155,28 @@ export default function BottomNav() {
         return;
       }
       const slot = getSlotIndex(e.clientX);
+      dragToRef.current = slot;
       setDragTo(slot);
     },
-    [isDragging, getSlotIndex]
+    [getSlotIndex]
   );
 
   const handlePointerUp = useCallback(() => {
     clearTimeout(longPressTimer.current);
-    if (isDragging && dragFrom !== null && dragTo !== null && dragFrom !== dragTo) {
+    const from = dragFromRef.current;
+    const to = dragToRef.current;
+    if (from !== null && to !== null && from !== to) {
       const newOrder = [...navOrder];
-      const [item] = newOrder.splice(dragFrom, 1);
-      newOrder.splice(dragTo, 0, item);
+      const [item] = newOrder.splice(from, 1);
+      newOrder.splice(to, 0, item);
       setNavOrder(newOrder);
       localStorage.setItem("doit-nav-order", JSON.stringify(newOrder));
     }
+    dragFromRef.current = null;
+    dragToRef.current = null;
     setDragFrom(null);
     setDragTo(null);
-  }, [isDragging, dragFrom, dragTo, navOrder]);
+  }, [navOrder]);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-secondary border-t border-border z-40">
