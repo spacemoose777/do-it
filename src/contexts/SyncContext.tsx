@@ -20,6 +20,21 @@ interface SyncContextType extends SyncState {
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
+// How long a sync is allowed to run before we abort and retry next interval.
+// Keeps the Firestore SDK from spinning heavy reconnect logic for too long on
+// degraded connections, which was causing the JS thread to stall and making
+// UI interactions (e.g. bottom nav taps) appear frozen.
+const SYNC_TIMEOUT_MS = 15_000;
+
+function withSyncTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Sync timed out")), SYNC_TIMEOUT_MS)
+    ),
+  ]);
+}
+
 export function SyncProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const isOnline = useOnlineStatus();
@@ -39,6 +54,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   const triggerSync = useCallback(async () => {
     if (!user || !isOnline || isSyncingRef.current) return;
+    // Don't sync while the page is hidden — saves the JS thread for when the
+    // user is actually looking at the app.
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
 
     isSyncingRef.current = true;
     setState((prev) => ({ ...prev, isSyncing: true, error: null }));
@@ -55,13 +73,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(SYNC_MIGRATION_KEY, "1");
       }
 
-      // Check if we need an initial load
+      // Check if we need an initial load, wrapped in a timeout so a hanging
+      // Firestore request doesn't stall the JS thread indefinitely.
       const lastSync = await getMeta("last_sync");
-      if (!lastSync) {
-        await initialLoad(user.uid);
-      } else {
-        await fullSync(user.uid);
-      }
+      await withSyncTimeout(
+        lastSync ? fullSync(user.uid).then(() => undefined) : initialLoad(user.uid)
+      );
 
       const count = await pendingCount();
       isSyncingRef.current = false;
@@ -109,6 +126,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       triggerSync();
     }
   }, [isOnline]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync when the tab becomes visible again (user switches back to the app).
+  // This catches the case where the background interval was skipped.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && isOnline && user) {
+        triggerSync();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [isOnline, triggerSync]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update pending count periodically
   useEffect(() => {
