@@ -34,28 +34,49 @@ export function startRecognition(callbacks: SpeechRecognitionCallback): void {
   recognition.lang = "en-US";
   recognition.maxAlternatives = 1;
 
-  recognition.onresult = (event: any) => {
-    let finalTranscript = "";
-    let interimTranscript = "";
+  // Track the complete final transcript across all onresult events.
+  // We delay firing the final callback until onend so the full utterance
+  // is always available — some mobile browsers fire a "final" onresult
+  // mid-sentence before the utterance is complete, which caused words to
+  // be cut off the end of the task title.
+  let finalTranscriptAccumulated = "";
+  const thisRecognition = recognition;
 
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
+  recognition.onresult = (event: any) => {
+    // Always iterate from 0 (not event.resultIndex) so we capture the full
+    // transcript even if resultIndex > 0 on some mobile browsers, which was
+    // causing words to be cut off the start/middle of the task title.
+    let finalText = "";
+    let interimText = "";
+
+    for (let i = 0; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
       if (event.results[i].isFinal) {
-        finalTranscript += transcript;
+        finalText += t;
       } else {
-        interimTranscript += transcript;
+        interimText += t;
       }
     }
 
-    if (finalTranscript) {
-      callbacks.onResult(finalTranscript, true);
-    } else if (interimTranscript) {
-      callbacks.onResult(interimTranscript, false);
+    finalTranscriptAccumulated = finalText;
+
+    // Report combined text for live display only — always as interim so we
+    // don't trigger the command until onend fires with the full utterance.
+    const displayText = finalText + interimText;
+    if (displayText) {
+      callbacks.onResult(displayText, false);
     }
   };
 
   recognition.onend = () => {
-    recognition = null;
+    // Only clear the module-level ref if it still points to THIS instance.
+    // If the modal was closed and reopened quickly, a new instance may already
+    // be running — we must not null it out.
+    if (recognition === thisRecognition) recognition = null;
+    // Fire the final command here, after the full utterance is complete.
+    if (finalTranscriptAccumulated) {
+      callbacks.onResult(finalTranscriptAccumulated, true);
+    }
     callbacks.onEnd();
   };
 
