@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useState, useRef, type KeyboardEvent } from "react";
 import { useSubtasks } from "@/hooks/useSubtasks";
 import Checkbox from "@/components/ui/Checkbox";
 
@@ -11,6 +11,28 @@ interface SubtaskListProps {
 export default function SubtaskList({ taskId }: SubtaskListProps) {
   const { subtasks, createSubtask, toggleSubtask, deleteSubtask, updateSubtask } = useSubtasks(taskId);
   const [newTitle, setNewTitle] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = (id: string, currentTitle: string) => {
+    setEditingId(id);
+    setEditingTitle(currentTitle);
+    setTimeout(() => editInputRef.current?.select(), 0);
+  };
+
+  const commitEdit = async (id: string) => {
+    const trimmed = editingTitle.trim();
+    if (trimmed && trimmed !== subtasks.find((s) => s.id === id)?.title) {
+      await updateSubtask(id, trimmed);
+    }
+    setEditingId(null);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent, id: string) => {
+    if (e.key === "Enter") { e.preventDefault(); commitEdit(id); }
+    if (e.key === "Escape") { setEditingId(null); }
+  };
 
   const handleAdd = () => {
     const trimmed = newTitle.trim();
@@ -52,11 +74,28 @@ export default function SubtaskList({ taskId }: SubtaskListProps) {
             checked={subtask.is_completed}
             onChange={() => toggleSubtask(subtask.id)}
           />
-          <span
-            className={`flex-1 text-sm ${subtask.is_completed ? "line-through text-text-secondary" : "text-text-primary"}`}
-          >
-            {subtask.title}
-          </span>
+          {editingId === subtask.id ? (
+            <input
+              ref={editInputRef}
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onBlur={() => commitEdit(subtask.id)}
+              onKeyDown={(e) => handleEditKeyDown(e, subtask.id)}
+              className="flex-1 text-sm bg-transparent text-text-primary focus:outline-none border-b border-accent"
+              autoFocus
+            />
+          ) : (
+            <span
+              onClick={() => !subtask.is_completed && startEditing(subtask.id, subtask.title)}
+              className={`flex-1 text-sm ${
+                subtask.is_completed
+                  ? "line-through text-text-secondary"
+                  : "text-text-primary cursor-text"
+              }`}
+            >
+              {subtask.title}
+            </span>
+          )}
           <button
             onClick={() => deleteSubtask(subtask.id)}
             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-bg-tertiary rounded transition-all"
