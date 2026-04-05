@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nickjones.doit",
+      "sha256_cert_fingerprints": [
+        "5D:B6:0F:20:30:B7:E3:26:BF:D2:16:B4:D2:D4:22:19:94:2C:CF:B7:D1:CD:9B:31:0C:C5:A7:9D:52:FC:DB:B7"
+      ]
+    }
+  }
+]
