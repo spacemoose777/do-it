@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type KeyboardEvent } from "react";
+import { useState, useRef, type KeyboardEvent, useCallback } from "react";
 
 interface TaskInputProps {
   onAdd: (title: string) => void;
@@ -10,41 +10,51 @@ interface TaskInputProps {
 
 export default function TaskInput({ onAdd, onMicClick, placeholder = "Add a task" }: TaskInputProps) {
   const [value, setValue] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
     onAdd(trimmed);
     setValue("");
-    inputRef.current?.focus();
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.focus();
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
   };
 
   return (
-    <div className="flex items-center gap-2 px-4 py-3 bg-bg-secondary rounded-xl border border-border">
-      <svg className="w-5 h-5 text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <div className="flex items-start gap-2 px-4 py-3 bg-bg-secondary rounded-xl border border-border">
+      <svg className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
       </svg>
-      <input
+      <textarea
         ref={inputRef}
-        type="text"
+        rows={1}
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => { setValue(e.target.value); autoResize(); }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/60 focus:outline-none"
+        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/60 focus:outline-none resize-none overflow-hidden leading-5"
       />
       {onMicClick && (
         <button
           onClick={onMicClick}
-          className="flex-shrink-0 p-1.5 hover:bg-bg-tertiary rounded-lg transition-colors"
+          className="flex-shrink-0 p-1.5 hover:bg-bg-tertiary rounded-lg transition-colors self-start"
           title="Voice input"
         >
           <svg className="w-5 h-5 text-text-secondary hover:text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
