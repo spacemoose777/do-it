@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type KeyboardEvent, useCallback } from "react";
+import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 
 interface TaskInputProps {
   onAdd: (title: string) => void;
@@ -12,12 +12,12 @@ export default function TaskInput({ onAdd, onMicClick, placeholder = "Add a task
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const autoResize = useCallback(() => {
+  useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, []);
+  }, [value]);
 
   const handleSubmit = () => {
     const trimmed = value.trim();
@@ -46,7 +46,7 @@ export default function TaskInput({ onAdd, onMicClick, placeholder = "Add a task
         ref={inputRef}
         rows={1}
         value={value}
-        onChange={(e) => { setValue(e.target.value); autoResize(); }}
+        onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/60 focus:outline-none resize-none overflow-hidden leading-5"
