@@ -28,8 +28,9 @@ export async function showLocalNotification(
   title: string,
   options?: NotificationOptions & { taskId?: string }
 ): Promise<void> {
-  const hasPermission = await requestNotificationPermission();
-  if (!hasPermission) return;
+  // Never request permission here — that's done upfront in registerFCMToken.
+  // Silently skip if the user hasn't granted permission yet.
+  if (typeof window === "undefined" || Notification.permission !== "granted") return;
 
   const registration = await navigator.serviceWorker?.ready;
   if (registration) {
