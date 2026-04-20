@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useRef, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 import { useTaskLists } from "@/hooks/useTaskLists";
@@ -38,9 +39,33 @@ const navIcons: Record<string, JSX.Element> = {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { lists } = useTaskLists();
+  const router = useRouter();
+  const { lists, createList } = useTaskLists();
   const { user, signOut } = useAuth();
   const { pendingCount, isSyncing } = useSync();
+  const [creating, setCreating] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startCreating = () => {
+    setCreating(true);
+    setNewListName("");
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const commitCreate = async () => {
+    const name = newListName.trim();
+    setCreating(false);
+    setNewListName("");
+    if (!name) return;
+    const list = await createList({ name });
+    if (list?.id) router.push(`/lists/${list.id}`);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") commitCreate();
+    if (e.key === "Escape") { setCreating(false); setNewListName(""); }
+  };
 
   return (
     <aside className="hidden md:flex flex-col w-[280px] h-screen bg-bg-secondary border-r border-border">
@@ -113,6 +138,33 @@ export default function Sidebar() {
                 </Link>
               );
             })}
+
+          {/* New list input / button */}
+          {creating ? (
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-bg-tertiary">
+              <span className="w-3 h-3 rounded-full flex-shrink-0 bg-text-secondary/30" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={commitCreate}
+                placeholder="List name"
+                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={startCreating}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-colors w-full"
+            >
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New list
+            </button>
+          )}
         </div>
       </nav>
 
