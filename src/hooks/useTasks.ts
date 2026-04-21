@@ -12,6 +12,18 @@ import type { Task, TaskCreateInput, TaskUpdateInput } from "@/types/task";
 
 export type SortField = "created_at" | "due_date" | "title" | "is_important" | "priority";
 
+// Sort a My Day task list by my_day_sort_order, completed tasks last
+function sortMyDay(taskList: Task[]): Task[] {
+  return [...taskList].sort((a, b) => {
+    if (a.is_completed !== b.is_completed) return a.is_completed ? 1 : -1;
+    if (a.my_day_sort_order !== null && b.my_day_sort_order !== null)
+      return a.my_day_sort_order - b.my_day_sort_order;
+    if (a.my_day_sort_order !== null) return -1;
+    if (b.my_day_sort_order !== null) return 1;
+    return a.sort_order - b.sort_order;
+  });
+}
+
 // Normalize a task from storage: handle missing fields from older records
 function normalizeTask(task: Task): Task {
   const reminders = task.reminders ?? (task.reminder_at ? [task.reminder_at] : []);
@@ -301,17 +313,28 @@ export function useTasks(filter?: {
     if (!existing) return;
 
     const normalizedExisting = normalizeTask(existing);
+    const markingImportant = !normalizedExisting.is_important;
+
+    // Move to top of My Day when marking important
+    let myDaySortOrder = normalizedExisting.my_day_sort_order;
+    if (markingImportant && normalizedExisting.is_my_day) {
+      const myDayTasks = tasks.filter((t) => t.is_my_day && !t.is_completed);
+      const minOrder = myDayTasks.length === 0 ? 0 : Math.min(...myDayTasks.map((t) => t.my_day_sort_order ?? 0));
+      myDaySortOrder = minOrder - 1;
+    }
+
     const updated: Task = {
       ...normalizedExisting,
-      is_important: !normalizedExisting.is_important,
+      is_important: markingImportant,
+      my_day_sort_order: myDaySortOrder,
       updated_at: nowISOString(),
     };
 
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
-    setTasks((prev) => applyFilter(prev.map((t) => (t.id === id ? updated : t))));
+    setTasks((prev) => sortMyDay(applyFilter(prev.map((t) => (t.id === id ? updated : t)))));
     return updated;
-  }, [applyFilter]);
+  }, [tasks, applyFilter]);
 
   const toggleMyDay = useCallback(async (id: string) => {
     const existing = await idb.getTask(id);
@@ -366,7 +389,7 @@ export function useTasks(filter?: {
 
     await idb.putTask(updated);
     await enqueue("tasks", id, "UPDATE", updated as unknown as Record<string, unknown>);
-    setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    setTasks((prev) => sortMyDay(prev.map((t) => (t.id === id ? updated : t))));
     return updated;
   }, [tasks]);
 
