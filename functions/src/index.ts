@@ -55,15 +55,25 @@ export const sendReminders = onSchedule(
 
       for (const taskDoc of tasks) {
         const task = taskDoc.data();
+        const title = `Reminder: ${task["title"] as string}`;
+        const body = (task["notes"] as string) || "You have a task reminder";
 
-        // Data-only FCM messages — our SW push handler shows the notification
+        // Use webpush.notification so Chrome shows the notification natively
+        // even when the app is fully closed, without depending on the push event
+        // handler running. Data payload carries taskId for notificationclick routing.
         const messages: admin.messaging.Message[] = tokens.map((token) => ({
           token,
-          data: {
-            title: `Reminder: ${task["title"] as string}`,
-            body: (task["notes"] as string) || "You have a task reminder",
-            tag: `reminder-${taskDoc.id}`,
-            taskId: taskDoc.id,
+          webpush: {
+            notification: {
+              title,
+              body,
+              icon: "/icons/icon-192.png",
+              badge: "/icons/icon-192.png",
+              tag: `reminder-${taskDoc.id}`,
+              data: { taskId: taskDoc.id },
+              vibrate: [200, 100, 200],
+            },
+            fcm_options: { link: "/my-day" },
           },
         }));
 

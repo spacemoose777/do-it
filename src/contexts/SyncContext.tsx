@@ -6,6 +6,8 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { fullSync, initialLoad, pushChanges } from "@/lib/sync/sync-engine";
 import { pendingCount } from "@/lib/sync/sync-queue";
 import { deleteMeta, getMeta } from "@/lib/db/indexed-db";
+import { enableNetwork, disableNetwork } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 // Bump this string to force a one-time full resync on all clients.
 // v5: push pending local changes first, then clear last_sync so initialLoad
@@ -90,6 +92,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       });
     } catch (err) {
       isSyncingRef.current = false;
+      // If the sync timed out, Firestore is likely stuck on a degraded network.
+      // Cycle the Firestore network connection to release hanging sockets so they
+      // don't pile up and freeze the JS thread.
+      if (err instanceof Error && err.message === "Sync timed out") {
+        try { await disableNetwork(db); } catch {}
+        setTimeout(async () => { try { await enableNetwork(db); } catch {} }, 3000);
+      }
       setState((prev) => ({
         ...prev,
         isSyncing: false,
@@ -97,6 +106,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       }));
     }
   }, [user, isOnline]);
+
+  // Tell Firestore to stop/start network activity when connectivity changes.
+  // Without this, Firestore keeps retrying its WebSocket on degraded WiFi,
+  // consuming JS thread resources and causing visible UI freezes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isOnline) {
+      enableNetwork(db).catch(() => {});
+    } else {
+      disableNetwork(db).catch(() => {});
+    }
+  }, [isOnline]);
 
   // Initial sync on login
   useEffect(() => {
