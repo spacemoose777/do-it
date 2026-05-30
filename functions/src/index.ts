@@ -13,6 +13,7 @@ export const sendReminders = onSchedule(
   async () => {
     const now = new Date();
     const nowISO = now.toISOString();
+    console.log(`[sendReminders] Running at ${nowISO}`);
 
     // Collection group query — searches users/{uid}/tasks across all users
     const tasksSnap = await db
@@ -20,6 +21,7 @@ export const sendReminders = onSchedule(
       .where("reminder_at", "<=", nowISO)
       .get();
 
+    console.log(`[sendReminders] Tasks with reminder_at <= now: ${tasksSnap.size}`);
     if (tasksSnap.empty) return;
 
     // Group tasks by user — uid comes from the doc path (users/{uid}/tasks/{taskId})
@@ -37,6 +39,8 @@ export const sendReminders = onSchedule(
     }
 
     for (const [uid, tasks] of byUser) {
+      console.log(`[sendReminders] User ${uid}: ${tasks.length} due task(s)`);
+
       // Get all FCM tokens for this user
       const tokensSnap = await db
         .collection("users")
@@ -44,6 +48,7 @@ export const sendReminders = onSchedule(
         .collection("fcm_tokens")
         .get();
 
+      console.log(`[sendReminders] User ${uid}: ${tokensSnap.size} FCM token(s)`);
       if (tokensSnap.empty) continue;
 
       const tokens = tokensSnap.docs

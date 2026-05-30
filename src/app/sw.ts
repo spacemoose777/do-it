@@ -43,31 +43,49 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-// Handle push notifications
+// Handle push notifications (data-only fallback — webpush.notification is handled natively by Chrome)
 self.addEventListener("push", (event) => {
+  console.log("[SW] Push received, has data:", !!event.data);
+
+  // When the Cloud Function sends webpush.notification, Chrome shows the notification
+  // natively and event.data will be empty or contain only non-notification data.
+  // We only need to show a notification here for data-only fallback messages.
   if (!event.data) return;
 
+  let payload: Record<string, unknown> = {};
   try {
-    const data = event.data.json();
-    event.waitUntil(
-      self.registration.showNotification(data.title || "Do It", {
-        body: data.body || "You have a reminder",
-        icon: "/icons/icon-192.png",
-        badge: "/icons/icon-192.png",
-        tag: data.tag || "reminder",
-        data: data.data ?? { taskId: data.taskId },
-        vibrate: [200, 100, 200],
-      } as NotificationOptions & { vibrate?: number[] })
-    );
+    payload = event.data.json() as Record<string, unknown>;
+    console.log("[SW] Push payload keys:", Object.keys(payload));
   } catch {
-    // Not JSON, use as plain text
+    // Treat as plain text
     event.waitUntil(
       self.registration.showNotification("Do It", {
         body: event.data.text(),
         icon: "/icons/icon-192.png",
       })
     );
+    return;
   }
+
+  // If the payload contains a notification object, Chrome already showed it natively.
+  // Showing it again here would create a duplicate — skip.
+  if (payload.notification) return;
+
+  // Data-only message — show it ourselves
+  const title = (payload.title as string) || "Do It";
+  const body = (payload.body as string) || "You have a reminder";
+  const tag = (payload.tag as string) || "reminder";
+  const taskId = (payload.taskId as string) || undefined;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag,
+      data: { taskId },
+    } as NotificationOptions)
+  );
 });
 
 serwist.addEventListeners();
